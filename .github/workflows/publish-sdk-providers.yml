@@ -78,7 +78,7 @@ jobs:
         run: |
           if compgen -G "${{ env.ARTIFACTS_PATH }}/*.nupkg" > /dev/null; then
             echo "Publicando pacotes NuGet..."
-            dotnet nuget push "${{ env.ARTIFACTS_PATH }}/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+            dotnet nuget push "${{ env.ARTIFACTS_PATH }}/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           else
             echo "Nenhum pacote .nupkg encontrado em ${{ env.ARTIFACTS_PATH }}"
             exit 1
