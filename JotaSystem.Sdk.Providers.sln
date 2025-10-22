@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36603.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JotaSystem.Sdk.Providers", "src\JotaSystem.Sdk.Providers\JotaSystem.Sdk.Providers.csproj", "{274E2661-31E9-4CDE-80AC-24CD4BBA0EE5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JotaSystem.Sdk.Providers.Tests", "tests\JotaSystem.Sdk.Providers.Tests\JotaSystem.Sdk.Providers.Tests.csproj", "{1F525A1A-AC41-4B87-AC72-9717370421F6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{274E2661-31E9-4CDE-80AC-24CD4BBA0EE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{274E2661-31E9-4CDE-80AC-24CD4BBA0EE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{274E2661-31E9-4CDE-80AC-24CD4BBA0EE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{274E2661-31E9-4CDE-80AC-24CD4BBA0EE5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F525A1A-AC41-4B87-AC72-9717370421F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F525A1A-AC41-4B87-AC72-9717370421F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F525A1A-AC41-4B87-AC72-9717370421F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F525A1A-AC41-4B87-AC72-9717370421F6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {33F5842F-B004-411A-B9BF-E87B7C47A608}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+
+		<PackageId>JotaSystem.Sdk.Providers</PackageId>
+		<Version>1.0.2</Version>
+		<Authors>Jota System</Authors>
+		<Company>Jota System</Company>
+		<Product>Jota System SDK Providers</Product>
+		<Title>Jota System SDK - Providers</Title>
+		<Description>Pacote com providers reutilizáveis.</Description>
+		<PackageTags>providers;jotasystem</PackageTags>
+		<RepositoryUrl>https://github.com/jotasystem/JotaSystem.Sdk</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/jotasystem/JotaSystem.Sdk</PackageProjectUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageIcon>icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackAsTool>False</PackAsTool>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\icon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
+	  <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.10" />
+	</ItemGroup>
+
+</Project>
