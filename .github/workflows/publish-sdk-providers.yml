@@ -1,0 +1,85 @@
+name: Publish NuGet Package (SDK - Providers)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    env:
+      CONFIGURATION: Release
+      DOTNET_VERSION: '9.0.x'
+      PROJECT_PATH: ./src/JotaSystem.Sdk.Providers/JotaSystem.Sdk.Providers.csproj
+      TEST_PROJECT_PATH: ./tests/JotaSystem.Sdk.Providers.Tests/JotaSystem.Sdk.Providers.Tests.csproj
+      ARTIFACTS_PATH: ./artifacts
+
+    steps:
+      - name: 1️⃣ Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 2️⃣ Capturar versão e PackageId do .csproj
+        id: get_version
+        run: |
+          version=$(grep -oP "(?<=<Version>).*?(?=</Version>)" "${{ env.PROJECT_PATH }}" | tr -d ' ')
+          packageId=$(grep -oP "(?<=<PackageId>).*?(?=</PackageId>)" "${{ env.PROJECT_PATH }}" | tr -d ' ')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "packageId=$packageId" >> $GITHUB_OUTPUT
+          echo "Detected package: $packageId version $version"
+
+      - name: 3️⃣ Verificar se versão já existe no NuGet (com retry)
+        id: check
+        run: |
+          package=$(echo "${{ steps.get_version.outputs.packageId }}" | tr '[:upper:]' '[:lower:]')
+          version=${{ steps.get_version.outputs.version }}
+          max_retries=5
+          delay=15
+      
+          for i in $(seq 1 $max_retries); do
+            echo "🔍 Tentativa $i de $max_retries..."
+            response=$(curl -s "https://api.nuget.org/v3-flatcontainer/${package}/index.json" || echo "")
+            if echo "$response" | grep -q "\"$version\""; then
+              echo "exists=true" >> $GITHUB_OUTPUT
+              echo "🚫 Versão $version já existe no NuGet. Encerrando workflow."
+              exit 0
+            fi
+            echo "⏳ Versão ainda não disponível, aguardando ${delay}s..."
+            sleep $delay
+          done
+
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "✅ Versão $version não encontrada, continuando publicação..."
+
+      - name: 4️⃣ Setup do .NET
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: 5️⃣ Restaurar dependências
+        if: steps.check.outputs.exists == 'false'
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: 6️⃣ Executar testes
+        if: steps.check.outputs.exists == 'false'
+        run: dotnet test ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }}
+
+      - name: 7️⃣ Build do projeto
+        if: steps.check.outputs.exists == 'false'
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }}
+
+      - name: 8️⃣ Pack do projeto (somente se versão não existe)
+        if: steps.check.outputs.exists == 'false'
+        run: dotnet pack ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} -o ${{ env.ARTIFACTS_PATH }}
+
+      - name: 9️⃣ Publicar no NuGet (somente se versão não existe)
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          if compgen -G "${{ env.ARTIFACTS_PATH }}/*.nupkg" > /dev/null; then
+            echo "Publicando pacotes NuGet..."
+            dotnet nuget push "${{ env.ARTIFACTS_PATH }}/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+          else
+            echo "Nenhum pacote .nupkg encontrado em ${{ env.ARTIFACTS_PATH }}"
+            exit 1
+          fi
