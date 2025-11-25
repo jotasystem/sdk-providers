@@ -15,3 +15,12 @@ Inclui:
 - **Mecanismos de fallback e retry.**
 
 ---
+
+## ⚙️ Como usar os Providers
+
+Para utilizar qualquer provider do pacote (ex.: ViaCepProvider, BrasilApiCepProvider), é obrigatório registrar as dependências na sua aplicação utilizando o método de extensão **AddJotaSystemProviders**.
+
+### 🛠 Registro no `Program.cs` ou `Startup.cs`
+
+```csharp
+builder.Services.AddJotaSystemProviders();

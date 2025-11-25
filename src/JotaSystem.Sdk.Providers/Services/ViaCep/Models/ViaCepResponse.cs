@@ -12,5 +12,6 @@
         public string Gia { get; set; } = string.Empty;
         public string Ddd { get; set; } = string.Empty;
         public string Siafi { get; set; } = string.Empty;
+        public bool? Erro { get; set; }
     }
 }

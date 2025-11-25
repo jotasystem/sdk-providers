@@ -21,23 +21,4 @@ namespace JotaSystem.Sdk.Providers.Tests.Services
             Assert.Equal("01001-000", result.Data?.Cep);
         }
     }
-
-    internal class MockHttpMessageHandler : HttpMessageHandler
-    {
-        private readonly string _response;
-
-        public MockHttpMessageHandler(string response)
-        {
-            _response = response;
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var message = new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(_response)
-            };
-            return Task.FromResult(message);
-        }
-    }
 }

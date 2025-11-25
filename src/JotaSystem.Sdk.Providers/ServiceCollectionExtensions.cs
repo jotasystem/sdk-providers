@@ -1,5 +1,6 @@
-﻿using JotaSystem.Sdk.Providers.Services.ViaCep;
-using JotaSystem.Sdk.Providers.Services.ViaCep.Interfaces;
+﻿using JotaSystem.Sdk.Providers.Contracts;
+using JotaSystem.Sdk.Providers.Services.BrasilApi;
+using JotaSystem.Sdk.Providers.Services.ViaCep;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JotaSystem.Sdk.Providers
@@ -11,8 +12,15 @@ namespace JotaSystem.Sdk.Providers
         /// </summary>
         public static IServiceCollection AddJotaSystemProviders(this IServiceCollection services)
         {
-            // Registra ViaCepProvider com HttpClient
+            // ViaCep
             services.AddHttpClient<IViaCepProvider, ViaCepProvider>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.Add("User-Agent", "JotaSystemSdk/1.0");
+            });
+
+            // BrasilAPI
+            services.AddHttpClient<IBrasilApiProvider, BrasilApiProvider>(client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(10);
                 client.DefaultRequestHeaders.Add("User-Agent", "JotaSystemSdk/1.0");
