@@ -8,7 +8,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
 		<PackageId>JotaSystem.Sdk.Providers</PackageId>
-		<Version>1.0.4</Version>
+		<Version>1.0.5</Version>
 		<Authors>Jota System</Authors>
 		<Company>Jota System</Company>
 		<Product>Jota System SDK Providers</Product>
