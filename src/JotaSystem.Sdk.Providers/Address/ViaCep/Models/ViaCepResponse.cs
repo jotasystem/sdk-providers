@@ -1,4 +1,4 @@
-﻿namespace JotaSystem.Sdk.Providers.Services.ViaCep.Models
+﻿namespace JotaSystem.Sdk.Providers.Address.ViaCep.Models
 {
     public class ViaCepResponse
     {

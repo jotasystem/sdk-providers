@@ -1,8 +1,7 @@
-﻿using JotaSystem.Sdk.Providers.Common;
-using JotaSystem.Sdk.Providers.Contracts;
-using JotaSystem.Sdk.Providers.Services.ViaCep.Models;
+﻿using JotaSystem.Sdk.Providers.Address.ViaCep.Models;
+using JotaSystem.Sdk.Providers.Common;
 
-namespace JotaSystem.Sdk.Providers.Services.ViaCep
+namespace JotaSystem.Sdk.Providers.Address.ViaCep
 {
     public class ViaCepProvider(HttpClient httpClient) : ProviderBase(httpClient), IViaCepProvider
     {

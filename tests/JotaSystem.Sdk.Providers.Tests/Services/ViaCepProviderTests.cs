@@ -1,4 +1,4 @@
-﻿using JotaSystem.Sdk.Providers.Services.ViaCep;
+﻿using JotaSystem.Sdk.Providers.Address.ViaCep;
 using System.Net;
 
 namespace JotaSystem.Sdk.Providers.Tests.Services

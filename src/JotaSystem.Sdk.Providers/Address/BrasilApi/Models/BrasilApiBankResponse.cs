@@ -1,4 +1,4 @@
-﻿namespace JotaSystem.Sdk.Providers.Services.BrasilApi.Models
+﻿namespace JotaSystem.Sdk.Providers.Address.BrasilApi.Models
 {
     public class BrasilApiBankResponse
     {

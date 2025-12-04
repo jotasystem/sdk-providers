@@ -1,8 +1,7 @@
-﻿using JotaSystem.Sdk.Providers.Common;
-using JotaSystem.Sdk.Providers.Contracts;
-using JotaSystem.Sdk.Providers.Services.BrasilApi.Models;
+﻿using JotaSystem.Sdk.Providers.Address.BrasilApi.Models;
+using JotaSystem.Sdk.Providers.Common;
 
-namespace JotaSystem.Sdk.Providers.Services.BrasilApi
+namespace JotaSystem.Sdk.Providers.Address.BrasilApi
 {
     public class BrasilApiProvider(HttpClient httpClient) : ProviderBase(httpClient), IBrasilApiProvider
     {

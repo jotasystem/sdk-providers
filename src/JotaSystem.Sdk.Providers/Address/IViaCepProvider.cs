@@ -1,7 +1,7 @@
-﻿using JotaSystem.Sdk.Providers.Common;
-using JotaSystem.Sdk.Providers.Services.ViaCep.Models;
+﻿using JotaSystem.Sdk.Providers.Address.ViaCep.Models;
+using JotaSystem.Sdk.Providers.Common;
 
-namespace JotaSystem.Sdk.Providers.Contracts
+namespace JotaSystem.Sdk.Providers.Address
 {
     /// <summary>
     /// https://viacep.com.br/

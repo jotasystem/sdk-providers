@@ -1,6 +1,6 @@
-﻿using JotaSystem.Sdk.Providers.Contracts;
-using JotaSystem.Sdk.Providers.Services.BrasilApi;
-using JotaSystem.Sdk.Providers.Services.ViaCep;
+﻿using JotaSystem.Sdk.Providers.Address;
+using JotaSystem.Sdk.Providers.Address.BrasilApi;
+using JotaSystem.Sdk.Providers.Address.ViaCep;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JotaSystem.Sdk.Providers
