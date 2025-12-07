@@ -1,35 +1,21 @@
-﻿using JotaSystem.Sdk.Providers.Address.ViaCep.Models;
-using JotaSystem.Sdk.Providers.Common;
+﻿using ViaCep;
 
 namespace JotaSystem.Sdk.Providers.Address.ViaCep
 {
-    public class ViaCepProvider(HttpClient httpClient) : ProviderBase(httpClient), IViaCepProvider
+    public class ViaCepProvider : IViaCepProvider
     {
-        private const string BaseUrl = "https://viacep.com.br/ws";
-
-        public async Task<ApiResponse<ViaCepResponse>> GetAddressAsync(string cep)
+        public async Task<ViaCepResult?> GetAddressByCepAsync(string cep, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(cep))
-                return ApiResponse<ViaCepResponse>.CreateFail("CEP inválido.");
+                throw new ArgumentException("CEP inválido.");
 
-            // remove caracteres não numéricos
-            cep = new string(cep.Where(char.IsDigit).ToArray());
+            cep = new string([.. cep.Where(char.IsDigit)]);
 
             if (cep.Length != 8)
-                return ApiResponse<ViaCepResponse>.CreateFail("CEP deve conter 8 dígitos.");
+                throw new ArgumentException("CEP incompleto");
 
-            var url = $"{BaseUrl}/{cep}/json/";
-
-            var response = await SendRequestAsync<ViaCepResponse>(HttpMethod.Get, url);
-
-            if (response.Success &&
-                response.Data is not null &&
-                response.Data.Erro == true)
-            {
-                return ApiResponse<ViaCepResponse>.CreateFail("CEP não encontrado.");
-            }
-
-            return response;
+            var client = new ViaCepClient();
+            return await client.SearchAsync(cep, cancellationToken);
         }
     }
 }

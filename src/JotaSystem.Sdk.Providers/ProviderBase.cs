@@ -1,6 +1,7 @@
-﻿using System.Text;
+﻿using JotaSystem.Sdk.Common.Helpers;
+using System.Text;
 
-namespace JotaSystem.Sdk.Providers.Common
+namespace JotaSystem.Sdk.Providers
 {
     public abstract class ProviderBase(HttpClient httpClient)
     {
@@ -58,7 +59,7 @@ namespace JotaSystem.Sdk.Providers.Common
                 if (!response.IsSuccessStatusCode)
                     return ApiResponse<T>.CreateFail($"Erro {response.StatusCode}: {content}");
 
-                return JsonHelper.Deserialize<T>(content);
+                return ApiResponse<T>.CreateSuccess(JsonHelper.Deserialize<T>(content)!);
             }
             catch (Exception ex)
             {

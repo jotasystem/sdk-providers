@@ -1,4 +1,4 @@
-﻿namespace JotaSystem.Sdk.Providers.Common
+﻿namespace JotaSystem.Sdk.Providers
 {
     public class ApiResponse<T>
     {

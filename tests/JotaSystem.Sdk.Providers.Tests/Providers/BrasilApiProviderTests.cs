@@ -1,7 +1,7 @@
 ﻿using JotaSystem.Sdk.Providers.Address.BrasilApi;
 using System.Net;
 
-namespace JotaSystem.Sdk.Providers.Tests.Services
+namespace JotaSystem.Sdk.Providers.Tests.Providers
 {
     public class BrasilApiProviderTests
     {

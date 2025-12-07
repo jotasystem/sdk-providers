@@ -1,7 +1,6 @@
 ﻿using JotaSystem.Sdk.Providers.Address.BrasilApi.Models;
-using JotaSystem.Sdk.Providers.Common;
 
-namespace JotaSystem.Sdk.Providers.Address
+namespace JotaSystem.Sdk.Providers.Address.BrasilApi
 {
     /// <summary>
     /// https://brasilapi.com.br/

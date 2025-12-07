@@ -1,7 +1,6 @@
 ﻿using JotaSystem.Sdk.Providers.Address.ViaCep;
-using System.Net;
 
-namespace JotaSystem.Sdk.Providers.Tests.Services
+namespace JotaSystem.Sdk.Providers.Tests.Providers
 {
     public class ViaCepProviderTests
     {
@@ -10,15 +9,13 @@ namespace JotaSystem.Sdk.Providers.Tests.Services
         {
             // Arrange
             var mockHandler = new MockHttpMessageHandler("{\"cep\":\"01001-000\",\"logradouro\":\"Praça da Sé\"}");
-            var httpClient = new HttpClient(mockHandler);
-            var provider = new ViaCepProvider(httpClient);
+            var provider = new ViaCepProvider();
 
             // Act
-            var result = await provider.GetAddressAsync("01001-000");
+            var result = await provider.GetAddressByCepAsync("01001-000");
 
             // Assert
-            Assert.True(result.Success);
-            Assert.Equal("01001-000", result.Data?.Cep);
+            Assert.Equal("01001-000", result!.ZipCode);
         }
     }
 }

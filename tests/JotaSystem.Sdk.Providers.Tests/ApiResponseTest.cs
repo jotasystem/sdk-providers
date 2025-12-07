@@ -1,6 +1,4 @@
-﻿using JotaSystem.Sdk.Providers.Common;
-
-namespace JotaSystem.Sdk.Providers.Tests.Common
+﻿namespace JotaSystem.Sdk.Providers.Tests
 {
     public class ApiResponseTest
     {

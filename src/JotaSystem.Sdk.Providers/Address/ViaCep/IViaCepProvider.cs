@@ -1,7 +1,6 @@
-﻿using JotaSystem.Sdk.Providers.Address.ViaCep.Models;
-using JotaSystem.Sdk.Providers.Common;
+﻿using ViaCep;
 
-namespace JotaSystem.Sdk.Providers.Address
+namespace JotaSystem.Sdk.Providers.Address.ViaCep
 {
     /// <summary>
     /// https://viacep.com.br/
@@ -11,6 +10,6 @@ namespace JotaSystem.Sdk.Providers.Address
         /// <summary>
         /// Consulta informações de endereço a partir de um CEP.
         /// </summary>
-        Task<ApiResponse<ViaCepResponse>> GetAddressAsync(string cep);
+        Task<ViaCepResult?> GetAddressByCepAsync(string cep, CancellationToken cancellationToken = default);
     }
 }
