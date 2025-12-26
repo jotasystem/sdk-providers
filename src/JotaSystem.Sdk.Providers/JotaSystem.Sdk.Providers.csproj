@@ -8,7 +8,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
 		<PackageId>JotaSystem.Sdk.Providers</PackageId>
-		<Version>1.0.6</Version>
+		<Version>1.0.7</Version>
 		<Authors>Jota System</Authors>
 		<Company>Jota System</Company>
 		<Product>Jota System SDK Providers</Product>
@@ -39,6 +39,7 @@
 	  <PackageReference Include="JotaSystem.Sdk.Common" Version="1.0.22" />
 	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
 	  <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.10" />
+	  <PackageReference Include="OpenAI" Version="2.8.0" />
 	  <PackageReference Include="SendGrid" Version="9.29.3" />
 	  <PackageReference Include="SendPulse.SDK" Version="1.0.0" />
 	  <PackageReference Include="ViaCep" Version="4.1.511" />
@@ -47,7 +48,6 @@
 	<ItemGroup>
 	  <Folder Include="Address\Correios\" />
 	  <Folder Include="Map\" />
-	  <Folder Include="Ai\" />
 	  <Folder Include="Storage\" />
 	  <Folder Include="PushNotification\" />
 	  <Folder Include="Payment\" />
