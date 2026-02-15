@@ -1,7 +1,7 @@
 ﻿using JotaSystem.Sdk.Common.Helpers;
 using System.Text;
 
-namespace JotaSystem.Sdk.Providers
+namespace JotaSystem.Sdk.Providers.Abstractions
 {
     public abstract class ProviderBase(HttpClient httpClient)
     {

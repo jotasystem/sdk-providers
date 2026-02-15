@@ -1,4 +1,6 @@
-﻿namespace JotaSystem.Sdk.Providers.Tests
+﻿using JotaSystem.Sdk.Providers.Abstractions;
+
+namespace JotaSystem.Sdk.Providers.Tests
 {
     public class ApiResponseTest
     {

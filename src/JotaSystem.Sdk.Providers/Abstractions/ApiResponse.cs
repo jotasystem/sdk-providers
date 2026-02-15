@@ -1,4 +1,4 @@
-﻿namespace JotaSystem.Sdk.Providers
+﻿namespace JotaSystem.Sdk.Providers.Abstractions
 {
     public class ApiResponse<T>
     {
