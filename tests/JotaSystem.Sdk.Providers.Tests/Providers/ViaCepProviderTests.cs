@@ -12,7 +12,7 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             var provider = new ViaCepProvider();
 
             // Act
-            var result = await provider.GetAddressByCepAsync("01001-000");
+            var result = await provider.GetAddressByCepAsync("01001-000", CancellationToken.None);
 
             // Assert
             Assert.Equal("01001-000", result!.ZipCode);
