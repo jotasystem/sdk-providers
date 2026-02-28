@@ -10,6 +10,7 @@ namespace JotaSystem.Sdk.Providers.Address
         {
             builder.Services.AddHttpClient<IViaCepProvider, ViaCepProvider>(client =>
             {
+                client.BaseAddress = new Uri("https://viacep.com.br/");
                 client.Timeout = TimeSpan.FromSeconds(10);
                 client.DefaultRequestHeaders.Add("User-Agent", "JotaSystemSdk/1.0");
             });
