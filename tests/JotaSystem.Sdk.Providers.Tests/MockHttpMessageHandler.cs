@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Http.Headers;
 
 namespace JotaSystem.Sdk.Providers.Tests
 {
@@ -19,6 +20,7 @@ namespace JotaSystem.Sdk.Providers.Tests
             {
                 Content = new StringContent(_response)
             };
+            message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             return Task.FromResult(message);
         }
     }

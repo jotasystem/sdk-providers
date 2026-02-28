@@ -1,21 +1,22 @@
-﻿using ViaCep;
+﻿using JotaSystem.Sdk.Common.Extensions.String;
+using ViaCep;
 
 namespace JotaSystem.Sdk.Providers.Address.ViaCep
 {
-    public class ViaCepProvider : IViaCepProvider
+    public class ViaCepProvider(HttpClient httpClient) : IViaCepProvider
     {
-        public async Task<ViaCepResult?> GetAddressByCepAsync(string cep, CancellationToken cancellationToken = default)
+        private readonly ViaCepClient _client = new(httpClient);
+
+        public async Task<ViaCepResult?> GetAddressByCepAsync(string cep,CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(cep))
-                throw new ArgumentException("CEP inválido.");
+            var sanitizedCep = cep.NormalizeSpecialCharacter();
 
-            cep = new string([.. cep.Where(char.IsDigit)]);
+            var result = await _client.SearchAsync(sanitizedCep, cancellationToken);
 
-            if (cep.Length != 8)
-                throw new ArgumentException("CEP incompleto");
+            if (result is null)
+                return null;
 
-            var client = new ViaCepClient();
-            return await client.SearchAsync(cep, cancellationToken);
+            return result;
         }
     }
 }

@@ -8,7 +8,12 @@ namespace JotaSystem.Sdk.Providers.Address
     {
         public static JotaSystemSdkBuilder AddViaCep(this JotaSystemSdkBuilder builder)
         {
-            builder.Services.AddHttpClient<IViaCepProvider, ViaCepProvider>();
+            builder.Services.AddHttpClient<IViaCepProvider, ViaCepProvider>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.Add("User-Agent", "JotaSystemSdk/1.0");
+            });
+
             return builder;
         }
 
