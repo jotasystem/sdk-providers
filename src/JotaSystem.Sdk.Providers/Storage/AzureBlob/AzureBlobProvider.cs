@@ -1,83 +1,137 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Sas;
+using JotaSystem.Sdk.Providers.Storage.AzureBlob.Models;
 
 namespace JotaSystem.Sdk.Providers.Storage.AzureBlob
 {
-    public class AzureBlobProvider(AzureBlobOptions options) : IAzureBlobProvider
+    public class AzureBlobProvider(BlobServiceClient blobServiceClient) : IAzureBlobProvider
     {
-        private readonly AzureBlobOptions _options = options;
-
-        private readonly BlobContainerClient _container =
-            new(options.ConnectionString, options.ContainerName);
-
-        public async Task UploadAsync(string key, Stream content, string contentType)
+        public async Task<AzureBlobResult> UploadAsync(Stream content, string container, string fileName, string? folder, string contentType = "application/octet-stream", CancellationToken cancellationToken = default)
         {
-            var blob = _container.GetBlobClient(key);
+            ArgumentNullException.ThrowIfNull(content);
 
-            await blob.UploadAsync(content, new BlobHttpHeaders
+            if (string.IsNullOrWhiteSpace(container))
+                throw new ArgumentException("Container inválido.", nameof(container));
+
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new ArgumentException("FileName inválido.", nameof(fileName));
+
+            if (content.CanSeek)
+                content.Position = 0;
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(container);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+
+            var blobPath = string.IsNullOrWhiteSpace(folder)
+                 ? fileName
+                 : $"{folder.Trim('/')}/{fileName}";
+
+            var blobClient = containerClient.GetBlobClient(blobPath);
+
+            var headers = new BlobHttpHeaders
             {
-                ContentType = contentType
-            });
-        }
-
-        public Task DeleteAsync(string key)
-        {
-            var blob = _container.GetBlobClient(key);
-            return blob.DeleteIfExistsAsync();
-        }
-
-        public async Task MoveAsync(string sourceKey, string destinationKey, bool overwrite = false)
-        {
-            var source = _container.GetBlobClient(sourceKey);
-            var dest = _container.GetBlobClient(destinationKey);
-
-            if (!await source.ExistsAsync())
-                throw new FileNotFoundException("Arquivo de origem não encontrado.", sourceKey);
-
-            if (!overwrite && await dest.ExistsAsync())
-                throw new InvalidOperationException("Arquivo de destino já existe.");
-
-            await dest.StartCopyFromUriAsync(source.Uri);
-            await source.DeleteAsync();
-        }
-
-        public Task<Uri> GetUploadUrlAsync(string key, string contentType, TimeSpan expiresIn)
-        {
-            var blob = _container.GetBlobClient(key);
-
-            var sas = new BlobSasBuilder
-            {
-                BlobContainerName = _container.Name,
-                BlobName = key,
-                Resource = "b",
-                ExpiresOn = DateTimeOffset.UtcNow.Add(expiresIn),
                 ContentType = contentType
             };
 
-            sas.SetPermissions(BlobSasPermissions.Create | BlobSasPermissions.Write);
+            await blobClient.UploadAsync(content, new BlobUploadOptions{ HttpHeaders = headers }, cancellationToken);
 
-            return Task.FromResult(blob.GenerateSasUri(sas));
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+
+            return new AzureBlobResult
+            {
+                FileName = fileName,
+                Path = $"{container}/{blobPath}",
+                Url = blobClient.Uri.ToString(),
+                ContentType = properties.Value.ContentType ?? "application/octet-stream",
+                Size = properties.Value.ContentLength,
+                Exists = true
+            };
         }
 
-        public Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiresIn, string? fileName = null)
+        public async Task<AzureBlobResult> DownloadAsync(string path, CancellationToken cancellationToken = default)
         {
-            var blob = _container.GetBlobClient(key);
+            var (container, blobPath) = ParsePath(path);
 
-            var sas = new BlobSasBuilder
+            var containerClient = blobServiceClient.GetBlobContainerClient(container);
+            var blobClient = containerClient.GetBlobClient(blobPath);
+
+            var exists = await blobClient.ExistsAsync(cancellationToken);
+            if (!exists.Value)
+                throw new FileNotFoundException($"Arquivo não encontrado: {path}");
+
+            var response = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
+
+            return new AzureBlobResult
             {
-                BlobContainerName = _container.Name,
-                BlobName = key,
-                Resource = "b",
-                ExpiresOn = DateTimeOffset.UtcNow.Add(expiresIn)
+                Content = response.Value.Content,
+                FileName = Path.GetFileName(blobPath),
+                Path = path,
+                Url = blobClient.Uri.ToString(),
+                ContentType = response.Value.Details.ContentType ?? "application/octet-stream",
+                Size = response.Value.Details.ContentLength,
+                Exists = true
             };
+        }
 
-            sas.SetPermissions(BlobSasPermissions.Read);
+        public async Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            var (container, blobPath) = ParsePath(path);
 
-            if (!string.IsNullOrWhiteSpace(fileName))
-                sas.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+            var containerClient = blobServiceClient.GetBlobContainerClient(container);
+            var blobClient = containerClient.GetBlobClient(blobPath);
 
-            return Task.FromResult(blob.GenerateSasUri(sas));
+            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+        }
+
+        public async Task<AzureBlobResult?> GetAsync(string path, CancellationToken cancellationToken = default)
+        {
+            var (container, blobPath) = ParsePath(path);
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(container);
+            var blobClient = containerClient.GetBlobClient(blobPath);
+
+            var exists = await blobClient.ExistsAsync(cancellationToken);
+            if (!exists.Value)
+                return null;
+
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+
+            return new AzureBlobResult
+            {
+                FileName = Path.GetFileName(blobPath),
+                Path = path,
+                Url = blobClient.Uri.ToString(),
+                ContentType = properties.Value.ContentType ?? "application/octet-stream",
+                Size = properties.Value.ContentLength,
+                Exists = true
+            };
+        }
+
+        public Task<string> GetUrlAsync(string path, CancellationToken cancellationToken = default)
+        {
+            var (container, blobPath) = ParsePath(path);
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(container);
+            var blobClient = containerClient.GetBlobClient(blobPath);
+
+            return Task.FromResult(blobClient.Uri.ToString());
+        }
+
+        private static (string container, string blobPath) ParsePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new ArgumentException("Path inválido.", nameof(path));
+
+            var normalized = path.Trim('/');
+            var index = normalized.IndexOf('/');
+
+            if (index <= 0 || index == normalized.Length - 1)
+                throw new InvalidOperationException($"Path inválido: {path}");
+
+            var container = normalized[..index];
+            var blobPath = normalized[(index + 1)..];
+
+            return (container, blobPath);
         }
     }
 }

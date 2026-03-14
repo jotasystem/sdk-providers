@@ -1,4 +1,5 @@
-﻿using JotaSystem.Sdk.Providers.Storage.AzureBlob;
+﻿using Azure.Storage.Blobs;
+using JotaSystem.Sdk.Providers.Storage.AzureBlob;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JotaSystem.Sdk.Providers.Storage
@@ -10,7 +11,13 @@ namespace JotaSystem.Sdk.Providers.Storage
             var options = new AzureBlobOptions();
             configure(options);
 
-            builder.Services.AddSingleton<IAzureBlobProvider>(new AzureBlobProvider(options));
+            if (string.IsNullOrWhiteSpace(options.ConnectionString))
+                throw new InvalidOperationException("AzureBlobOptions.ConnectionString não foi configurada.");
+
+            builder.Services.AddSingleton(options);
+            builder.Services.AddSingleton(_ => new BlobServiceClient(options.ConnectionString));
+            builder.Services.AddScoped<IAzureBlobProvider, AzureBlobProvider>();
+
             return builder;
         }
     }

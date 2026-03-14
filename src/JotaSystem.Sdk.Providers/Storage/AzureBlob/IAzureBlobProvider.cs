@@ -1,15 +1,13 @@
-﻿namespace JotaSystem.Sdk.Providers.Storage.AzureBlob
+﻿using JotaSystem.Sdk.Providers.Storage.AzureBlob.Models;
+
+namespace JotaSystem.Sdk.Providers.Storage.AzureBlob
 {
     public interface IAzureBlobProvider
     {
-        Task<Uri> GetUploadUrlAsync(string key, string contentType, TimeSpan expiresIn);
-
-        Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiresIn, string? fileName = null);
-
-        Task UploadAsync(string key, Stream content, string contentType);
-
-        Task DeleteAsync(string key);
-
-        Task MoveAsync(string sourceKey, string destinationKey, bool overwrite = false);
+        Task<AzureBlobResult> UploadAsync(Stream content, string container, string fileName, string? folder, string contentType = "application/octet-stream", CancellationToken cancellationToken = default);
+        Task<AzureBlobResult> DownloadAsync(string path, CancellationToken cancellationToken = default);
+        Task DeleteAsync(string path, CancellationToken cancellationToken = default);
+        Task<AzureBlobResult?> GetAsync(string path, CancellationToken cancellationToken = default);
+        Task<string> GetUrlAsync(string path, CancellationToken cancellationToken = default);
     }
 }
