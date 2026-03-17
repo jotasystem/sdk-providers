@@ -19,6 +19,8 @@ namespace JotaSystem.Sdk.Providers.Storage.AzureBlob
             if (content.CanSeek)
                 content.Position = 0;
 
+            fileName = EnsureFileNameWithExtension(fileName, contentType);
+
             var containerClient = blobServiceClient.GetBlobContainerClient(container);
             await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
 
@@ -132,6 +134,40 @@ namespace JotaSystem.Sdk.Providers.Storage.AzureBlob
             var blobPath = normalized[(index + 1)..];
 
             return (container, blobPath);
+        }
+
+        private static string EnsureFileNameWithExtension(string fileName, string contentType)
+        {
+            var extension = Path.GetExtension(fileName);
+            if (!string.IsNullOrWhiteSpace(extension))
+                return fileName;
+
+            var mappedExtension = GetExtensionFromContentType(contentType);
+
+            return string.IsNullOrWhiteSpace(mappedExtension)
+                ? fileName
+                : $"{fileName}{mappedExtension}";
+        }
+
+        private static string GetExtensionFromContentType(string contentType)
+        {
+            if (string.IsNullOrWhiteSpace(contentType))
+                return string.Empty;
+
+            return contentType.ToLowerInvariant() switch
+            {
+                "image/jpeg" => ".jpg",
+                "image/jpg" => ".jpg",
+                "image/png" => ".png",
+                "image/gif" => ".gif",
+                "image/webp" => ".webp",
+                "image/svg+xml" => ".svg",
+                "application/pdf" => ".pdf",
+                "text/plain" => ".txt",
+                "application/json" => ".json",
+                "application/zip" => ".zip",
+                _ => string.Empty
+            };
         }
     }
 }
