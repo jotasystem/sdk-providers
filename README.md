@@ -1,26 +1,51 @@
 # JotaSystem.Sdk.Providers
 
-Pacote de provedores e integrações externas da **Jota System**, com implementações voltadas à comunicação com serviços de terceiros.
+Biblioteca de integrações externas da **Jota System** para aplicações .NET.
 
----
+## Descrição
 
-## 📦 Descrição
+O `JotaSystem.Sdk.Providers` reúne implementações concretas de comunicação com serviços de terceiros e um builder para registro modular dessas integrações no container de DI.
 
-O **JotaSystem.Sdk.Providers** concentra as implementações de integração externas, fornecendo provedores prontos e padronizados que podem ser utilizados de forma isolada ou em conjunto com outros SDKs da Jota System.
+Hoje o pacote contém:
 
-Inclui:
-- **Provedores HTTP e REST** com autenticação e logging.
-- **Integrações com serviços externos** (ex: APIs de pagamento, envio de e-mails, notificações, etc.).
-- **Interfaces e contratos de provedores** para uso genérico.
-- **Mecanismos de fallback e retry.**
+- `Abstractions` com `ApiResponse` e `ProviderBase` para padronizar chamadas HTTP e respostas.
+- `Address` com providers de consulta de endereço e bancos via `ViaCep` e `BrasilApi`.
+- `Ai` com integração de chat via `OpenAI`.
+- `Email` com implementações para `SMTP`, `Brevo`, `SendGrid` e `SendPulse`.
+- `Storage` com implementação para `Azure Blob Storage`.
+- `DependencyInjection` com `AddJotaSystemProviders()` e extensões modulares por área.
 
----
+## Registro e composição
 
-## ⚙️ Como usar os Providers
-
-Para utilizar qualquer provider do pacote (ex.: ViaCepProvider, BrasilApiCepProvider), é obrigatório registrar as dependências na sua aplicação utilizando o método de extensão **AddJotaSystemProviders**.
-
-### 🛠 Registro no `Program.cs` ou `Startup.cs`
+O pacote usa um builder próprio para permitir composição por provider:
 
 ```csharp
-builder.Services.AddJotaSystemProviders();
+builder.Services
+    .AddJotaSystemProviders()
+    .AddViaCep()
+    .AddBrasilApi()
+    .AddOpenAi(options =>
+    {
+        options.ApiKey = "...";
+        options.Model = "...";
+    })
+    .AddSmtp(options =>
+    {
+        options.Host = "...";
+    })
+    .AddAzureBlob(options =>
+    {
+        options.ConnectionString = "...";
+    });
+```
+
+## Providers disponíveis
+
+- Endereço: `IViaCepProvider`, `IBrasilApiProvider`
+- IA: `IOpenAiProvider`
+- E-mail: `ISmtpProvider`, `IBrevoProvider`, `ISendGridProvider`, `ISendPulseProvider`
+- Storage: `IAzureBlobProvider`
+
+## Perfil do pacote
+
+Este SDK representa a camada de adaptação para serviços externos. Ele pode ser consumido isoladamente, mas o uso mais natural é como implementação concreta dos contratos de infraestrutura definidos pela arquitetura da Jota System.
