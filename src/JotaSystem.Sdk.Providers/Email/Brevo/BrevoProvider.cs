@@ -21,14 +21,10 @@ namespace JotaSystem.Sdk.Providers.Email.Brevo
 
             var sendEmail = new SendSmtpEmail
             {
-                Sender = new SendSmtpEmailSender { Name = options.FromName, Email = options.FromEmail },
+                Sender = new SendSmtpEmailSender(options.FromName, options.FromEmail),
                 To = tos,
                 Subject = subject,
-                ReplyTo = new SendSmtpEmailReplyTo
-                {
-                    Email = replyToEmail ?? options.FromEmail,
-                    Name = replyToName ?? options.FromName
-                }
+                ReplyTo = new SendSmtpEmailReplyTo(replyToEmail ?? options.FromEmail, replyToName ?? options.FromName)
             };
 
             if (isHtml) sendEmail.HtmlContent = body;
