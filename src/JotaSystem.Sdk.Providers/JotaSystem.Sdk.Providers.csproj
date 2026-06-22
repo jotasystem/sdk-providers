@@ -8,7 +8,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
 		<PackageId>JotaSystem.Sdk.Providers</PackageId>
-		<Version>1.0.14</Version>
+		<Version>1.0.15</Version>
 		<Authors>Jota System</Authors>
 		<Company>Jota System</Company>
 		<Product>Jota System SDK Providers</Product>
@@ -24,6 +24,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Map\**" />
+	  <EmbeddedResource Remove="Map\**" />
+	  <None Remove="Map\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<None Include="..\..\icon.png">
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>
@@ -35,23 +41,22 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+	  <PackageReference Include="Azure.Storage.Blobs" Version="12.29.0" />
 	  <PackageReference Include="brevo_csharp" Version="1.1.2" />
-	  <PackageReference Include="JotaSystem.Sdk.Common" Version="1.0.48" />
-	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
-	  <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.3" />
-	  <PackageReference Include="OpenAI" Version="2.9.0" />
+	  <PackageReference Include="JotaSystem.Sdk.Common" Version="1.0.69" />
+	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+	  <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
+	  <PackageReference Include="OpenAI" Version="2.11.0" />
 	  <PackageReference Include="SendGrid" Version="9.29.3" />
 	  <PackageReference Include="SendPulse.SDK" Version="1.0.0" />
-	  <PackageReference Include="ViaCep" Version="4.1.511" />
+	  <PackageReference Include="ViaCep" Version="5.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Address\Correios\" />
-	  <Folder Include="Map\" />
-	  <Folder Include="Payment\" />
-	  <Folder Include="PushNotification\" />
-	  <Folder Include="Sms\" />
+	  <Folder Include="Logistics\Maps\" />
+	  <Folder Include="Communication\Push\" />
+	  <Folder Include="Communication\Sms\" />
+	  <Folder Include="Payments\" />
 	</ItemGroup>
 
 </Project>

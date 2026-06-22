@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Text;
-using JotaSystem.Sdk.Providers.Abstractions;
 using Moq;
 using Moq.Protected;
 

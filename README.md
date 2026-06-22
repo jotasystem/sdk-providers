@@ -9,9 +9,9 @@ O `JotaSystem.Sdk.Providers` reúne implementações concretas de comunicação 
 Hoje o pacote contém:
 
 - `Abstractions` com `ApiResponse` e `ProviderBase` para padronizar chamadas HTTP e respostas.
-- `Address` com providers de consulta de endereço e bancos via `ViaCep` e `BrasilApi`.
+- `Logistics` centraliza consulta de endereços e fretes via `ViaCep`, `OpenCep`, `BrasilApi` e `Correios`.
 - `Ai` com integração de chat via `OpenAI`.
-- `Email` com implementações para `SMTP`, `Brevo`, `SendGrid` e `SendPulse`.
+- `Communication` centraliza os canais `Email`, `Sms` e `PushNotification`, com implementações de e-mail para `SMTP`, `Brevo`, `SendGrid` e `SendPulse`.
 - `Storage` com implementação para `Azure Blob Storage`.
 - `DependencyInjection` com `AddJotaSystemProviders()` e extensões modulares por área.
 
@@ -23,7 +23,17 @@ O pacote usa um builder próprio para permitir composição por provider:
 builder.Services
     .AddJotaSystemProviders()
     .AddViaCep()
+    .AddOpenCep()
     .AddBrasilApi()
+    .AddCorreios(options =>
+    {
+        options.DefaultCredentials = new CorreiosCredentials
+        {
+            UserName = "...",
+            AccessCode = "...",
+            PostingCardNumber = "..."
+        };
+    })
     .AddOpenAi(options =>
     {
         options.ApiKey = "...";
@@ -41,9 +51,9 @@ builder.Services
 
 ## Providers disponíveis
 
-- Endereço: `IViaCepProvider`, `IBrasilApiProvider`
+- Logística: `IViaCepProvider`, `IOpenCepProvider`, `IBrasilApiProvider`, `ICorreiosProvider`
 - IA: `IOpenAiProvider`
-- E-mail: `ISmtpProvider`, `IBrevoProvider`, `ISendGridProvider`, `ISendPulseProvider`
+- Comunicação: `ISmtpProvider`, `IBrevoProvider`, `ISendGridProvider`, `ISendPulseProvider`
 - Storage: `IAzureBlobProvider`
 
 ## Perfil do pacote

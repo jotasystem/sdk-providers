@@ -1,4 +1,4 @@
-﻿using JotaSystem.Sdk.Providers.Address.BrasilApi;
+using JotaSystem.Sdk.Providers.Logistics.Address.BrasilApi;
 using System.Net;
 
 namespace JotaSystem.Sdk.Providers.Tests.Providers
