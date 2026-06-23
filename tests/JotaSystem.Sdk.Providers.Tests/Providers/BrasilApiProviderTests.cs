@@ -71,7 +71,7 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             var provider = new BrasilApiProvider(httpClient);
 
             // Act
-            var result = await provider.GetCepAsync("01001-000");
+            var result = await provider.GetAddressByCepAsync("01001-000");
 
             // Assert
             Assert.True(result.Success);
@@ -89,7 +89,7 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             var provider = new BrasilApiProvider(new HttpClient());
 
             // Act
-            var result = await provider.GetCepAsync("abc");
+            var result = await provider.GetAddressByCepAsync("abc");
 
             // Assert
             Assert.False(result.Success);
@@ -105,7 +105,7 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             var provider = new BrasilApiProvider(httpClient);
 
             // Act
-            var result = await provider.GetCepAsync("01001000");
+            var result = await provider.GetAddressByCepAsync("01001000");
 
             // Assert
             Assert.False(result.Success);

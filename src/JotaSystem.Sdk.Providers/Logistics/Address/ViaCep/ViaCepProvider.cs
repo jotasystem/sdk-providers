@@ -7,15 +7,15 @@ namespace JotaSystem.Sdk.Providers.Logistics.Address.ViaCep
     {
         private readonly IViaCepClient _client = client;
 
-        public async Task<ViaCepResult?> GetAddressByCepAsync(string cep, CancellationToken cancellationToken = default)
+        public async Task<ApiResponse<ViaCepResult?>> GetAddressByCepAsync(string cep, CancellationToken cancellationToken = default)
         {
             var sanitizedCep = cep.NormalizeSpecialCharacter();
 
             var result = await _client.SearchAsync(sanitizedCep, cancellationToken);
-            return result ?? null;
+            return ApiResponse<ViaCepResult?>.CreateSuccess(result ?? null);
         }
 
-        public async Task<IEnumerable<ViaCepResult>> GetCepsByAddressAsync(string state, string city, string street, CancellationToken cancellationToken = default)
+        public async Task<ApiResponse<IEnumerable<ViaCepResult>>> GetCepsByAddressAsync(string state, string city, string street, CancellationToken cancellationToken = default)
         {
             var sanitizedState = state?.Trim().ToUpperInvariant();
             var sanitizedCity = city?.NormalizeWhitespace();
@@ -31,7 +31,7 @@ namespace JotaSystem.Sdk.Providers.Logistics.Address.ViaCep
                 throw new ArgumentException($"Logradouro deve conter ao menos três caracteres.", nameof(street));
 
             var results = await _client.SearchAsync(sanitizedState, sanitizedCity, sanitizedStreet, cancellationToken);
-            return results ?? [];
+            return ApiResponse<IEnumerable<ViaCepResult>>.CreateSuccess(results ?? []);
         }
     }
 }

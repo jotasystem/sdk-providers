@@ -33,8 +33,8 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal("01001-000", result!.ZipCode);
-            Assert.Equal("Praça da Sé", result.Street);
+            Assert.Equal("01001-000", result!.Data?.ZipCode);
+            Assert.Equal("Praça da Sé", result.Data?.Street);
         }
 
         [Fact]
@@ -72,11 +72,11 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
                 " sp ",
                 "  São   Paulo ",
                 " Avenida   Paulista ",
-                TestContext.Current.CancellationToken)).ToList();
+                TestContext.Current.CancellationToken)).Data?.ToList();
 
             // Assert
-            Assert.Equal(2, result.Count);
-            Assert.Equal("01311-000", result[0].ZipCode);
+            Assert.Equal(2, result?.Count);
+            Assert.Equal("01311-000", result![0].ZipCode);
             Assert.Equal("Avenida Paulista", result[0].Street);
             Assert.Equal(
                 "https://viacep.com.br/ws/SP/S%C3%A3o%20Paulo/Avenida%20Paulista/json",

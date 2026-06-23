@@ -8,6 +8,6 @@ namespace JotaSystem.Sdk.Providers.Logistics.Address.BrasilApi
     public interface IBrasilApiProvider
     {
         Task<ApiResponse<List<BrasilApiBankResponse>>> GetBanksAsync();
-        Task<ApiResponse<BrasilApiCepResponse>> GetCepAsync(string cep);
+        Task<ApiResponse<BrasilApiCepResponse>> GetAddressByCepAsync(string cep);
     }
 }

@@ -16,7 +16,7 @@ namespace JotaSystem.Sdk.Providers.Logistics.Address.BrasilApi
             return response;
         }
 
-        public async Task<ApiResponse<BrasilApiCepResponse>> GetCepAsync(string cep)
+        public async Task<ApiResponse<BrasilApiCepResponse>> GetAddressByCepAsync(string cep)
         {
             if (string.IsNullOrWhiteSpace(cep))
                 return ApiResponse<BrasilApiCepResponse>.CreateFail("CEP inválido.");
