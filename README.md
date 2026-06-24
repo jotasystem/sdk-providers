@@ -51,7 +51,7 @@ builder.Services
 
 ## Providers disponíveis
 
-- Logística: `IViaCepProvider`, `IOpenCepProvider`, `IBrasilApiProvider`, `ICorreiosProvider`
+- Logística: `IViaCepProvider`, `IOpenCepProvider`, `IBrasilApiProvider`, `ICorreiosProvider`, `IMelhorEnvioProvider`
 - IA: `IOpenAiProvider`
 - Comunicação: `ISmtpProvider`, `IBrevoProvider`, `ISendGridProvider`, `ISendPulseProvider`
 - Storage: `IAzureBlobProvider`

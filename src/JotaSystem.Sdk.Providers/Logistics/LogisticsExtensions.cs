@@ -2,6 +2,7 @@ using JotaSystem.Sdk.Providers.Logistics.Address.BrasilApi;
 using JotaSystem.Sdk.Providers.Logistics.Address.OpenCep;
 using JotaSystem.Sdk.Providers.Logistics.Address.ViaCep;
 using JotaSystem.Sdk.Providers.Logistics.Shipping.Correios;
+using JotaSystem.Sdk.Providers.Logistics.Shipping.MelhorEnvio;
 using Microsoft.Extensions.DependencyInjection;
 using ViaCep;
 
@@ -68,6 +69,21 @@ namespace JotaSystem.Sdk.Providers.Logistics
             });
 
             builder.Services.AddScoped<ICorreiosProvider, CorreiosProvider>();
+            return builder;
+        }
+
+        public static JotaSystemSdkBuilder AddMelhorEnvio(this JotaSystemSdkBuilder builder, Action<MelhorEnvioOptions>? configure = null)
+        {
+            var options = new MelhorEnvioOptions();
+            configure?.Invoke(options);
+
+            builder.Services.AddSingleton(options);
+            builder.Services.AddHttpClient<IMelhorEnvioProvider, MelhorEnvioProvider>(client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = options.Timeout;
+            });
+
             return builder;
         }
     }
