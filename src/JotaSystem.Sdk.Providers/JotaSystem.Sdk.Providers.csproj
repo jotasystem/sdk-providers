@@ -8,7 +8,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
 		<PackageId>JotaSystem.Sdk.Providers</PackageId>
-		<Version>1.0.20</Version>
+		<Version>1.0.21</Version>
 		<Authors>Jota System</Authors>
 		<Company>Jota System</Company>
 		<Product>Jota System SDK Providers</Product>
@@ -44,7 +44,7 @@
 	  <PackageReference Include="Azure.Storage.Blobs" Version="12.29.1" />
 	  <PackageReference Include="brevo_csharp" Version="1.1.2" />
 	  <PackageReference Include="JotaSystem.Sdk.Common" Version="1.0.71" />
-	  <PackageReference Include="JotaSystem.Sdk.Core" Version="1.0.89" />
+	  <PackageReference Include="JotaSystem.Sdk.Core" Version="1.0.90" />
 	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
 	  <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
 	  <PackageReference Include="OpenAI" Version="2.13.0" />
