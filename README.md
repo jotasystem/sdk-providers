@@ -77,6 +77,14 @@ Meios de pagamento aceitos no código do método (`MethodCode`):
 
 Cartão, endereço do pagador e parâmetros de recorrência vêm do próprio contrato de pagamento do `JotaSystem.Sdk.Core`: `PaymentProviderRequest.Card` (`PaymentCard`), `Customer.Address` (`PaymentAddress`) e `PaymentProviderRequest.Recurrence` (`PaymentRecurrence`). Em `PaymentCard`, o número e o código de segurança não são serializados — chegam à Cielo, mas ficam fora de log e de payload persistido.
 
+### Captura do cartão no navegador (Silent Order Post)
+
+O caminho recomendado para crédito é não deixar o cartão passar pelo servidor da loja. `CreateCheckoutSessionAsync` abre uma sessão do **Silent Order Post**: o SDK autentica no OAuth2 da Cielo com `ClientId`/`ClientSecret`, pede um `AccessToken` de sessão e devolve, junto dele, o endereço do script e o ambiente. A página de checkout carrega o script, marca os campos com as classes `bp-sop-cardnumber`, `bp-sop-cardexpirationdate`, `bp-sop-cardholdername` e `bp-sop-cardcvv`, e chama `bpSop_silentOrderPost`. A Cielo devolve ao navegador um `PaymentToken` de uso único, válido por 20 minutos.
+
+Esse token é enviado à cobrança em `PaymentCard.SingleUseToken`; o provider o traduz para `Payment.CreditCard.PaymentToken` e **não envia nenhum outro dado do cartão** — número, validade e CVV já estão dentro do token, e reenviá-los faz a Cielo recusar a autorização.
+
+O token OAuth2 dura cerca de dez minutos e é reaproveitado entre requisições por um cache em memória, então abrir vários checkouts não gera uma autenticação por checkout.
+
 Os metadados da cobrança ficam reservados aos ajustes específicos da Cielo, com as chaves de `CieloMetadataKeys`: `soft_descriptor`, `capture`, `boleto_provider`, `boleto_assignor`, `boleto_instructions`, `boleto_demonstrative`, `boleto_identification` e `boleto_number`. Cada um deles também pode ser definido no `PublicConfigJson` da integração ou nas `CieloOptions`, nessa ordem de precedência.
 
 As credenciais são resolvidas nesta ordem: credenciais nomeadas em `NamedCredentials` pela `SecretReference` da integração; `merchantId` do `PublicConfigJson` combinado com a `SecretReference` como `MerchantKey`; e, por último, `DefaultCredentials`. O ambiente (`sandbox` ou `production`) vem da própria integração.

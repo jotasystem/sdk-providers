@@ -15,6 +15,15 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
     public interface ICieloProvider
     {
         /// <summary>
+        /// Abre uma sessao do Silent Order Post. O token devolvido autoriza o script da
+        /// Cielo, na pagina de checkout, a receber o cartao e devolver um <c>PaymentToken</c>
+        /// de uso unico — os dados do cartao nao passam pelo servidor da loja.
+        /// </summary>
+        Task<ApiResponse<CieloSilentOrderPostToken>> CreateSilentOrderPostTokenAsync(
+            CieloCredentials? credentials = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Cria uma venda (<c>POST /1/sales/</c>). O meio de pagamento e definido por
         /// <see cref="CieloPaymentRequest.Type"/>.
         /// </summary>

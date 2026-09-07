@@ -22,6 +22,7 @@ namespace JotaSystem.Sdk.Providers.Payments
             configure?.Invoke(options);
 
             builder.Services.AddSingleton(options);
+            builder.Services.AddSingleton<ICieloAuthTokenCache, CieloAuthTokenCache>();
 
             builder.Services.AddHttpClient(CieloHttpClientNames.Default, client =>
             {

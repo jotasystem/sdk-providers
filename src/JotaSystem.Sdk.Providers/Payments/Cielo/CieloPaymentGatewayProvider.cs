@@ -21,6 +21,28 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         public string ProviderKey => "cielo";
 
+        public async Task<PaymentCheckoutSession> CreateCheckoutSessionAsync(
+            PaymentCheckoutSessionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var config = CieloIntegrationConfig.Parse(request.Context?.PublicConfigJson);
+            var credentials = ResolveCredentials(request.Context, config);
+            if (credentials is null)
+                return new PaymentCheckoutSession(false, Message: MissingCredentialsMessage);
+
+            var response = await _cieloProvider.CreateSilentOrderPostTokenAsync(credentials, cancellationToken);
+            if (!response.Success)
+                return new PaymentCheckoutSession(false, Message: response.ErrorMessage);
+
+            var token = response.Data!;
+            return new PaymentCheckoutSession(
+                true,
+                token.AccessToken,
+                token.ScriptUrl,
+                token.Environment,
+                ParseExpiration(token.Issued, token.ExpiresIn));
+        }
+
         public async Task<PaymentProviderResult> CreateAsync(
             PaymentProviderRequest request,
             CancellationToken cancellationToken = default)
@@ -288,19 +310,31 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             };
         }
 
-        private static CieloCreditCardRequest? BuildCreditCard(PaymentCard? card) =>
-            card is null
-                ? null
-                : new CieloCreditCardRequest
+        private static CieloCreditCardRequest? BuildCreditCard(PaymentCard? card)
+        {
+            if (card is null)
+                return null;
+
+            // O token de uso unico ja carrega numero, validade e CVV: reenviar esses dados
+            // faria a Cielo recusar a autorizacao.
+            if (!string.IsNullOrWhiteSpace(card.SingleUseToken))
+                return new CieloCreditCardRequest
                 {
-                    CardToken = card.Token,
-                    CardNumber = OnlyDigits(card.Number),
-                    Holder = card.Holder,
-                    ExpirationDate = card.ExpirationDate,
-                    SecurityCode = card.SecurityCode,
-                    Brand = card.Brand,
-                    SaveCard = card.SaveCard ? true : null
+                    PaymentToken = card.SingleUseToken,
+                    Brand = card.Brand
                 };
+
+            return new CieloCreditCardRequest
+            {
+                CardToken = card.Token,
+                CardNumber = OnlyDigits(card.Number),
+                Holder = card.Holder,
+                ExpirationDate = card.ExpirationDate,
+                SecurityCode = card.SecurityCode,
+                Brand = card.Brand,
+                SaveCard = card.SaveCard ? true : null
+            };
+        }
 
         private static CieloCustomer BuildCustomer(PaymentProviderRequest request)
         {
@@ -544,6 +578,18 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         private static Uri? BuildUri(string? url) =>
             Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri : null;
+
+        // A Cielo devolve emissao e expiracao da sessao sem fuso. A diferenca entre as duas
+        // e o unico dado confiavel, entao a validade e projetada a partir de agora.
+        private static DateTimeOffset? ParseExpiration(string? issued, string? expiresIn)
+        {
+            if (!DateTime.TryParse(issued, CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) ||
+                !DateTime.TryParse(expiresIn, CultureInfo.InvariantCulture, DateTimeStyles.None, out var end) ||
+                end <= start)
+                return null;
+
+            return DateTimeOffset.UtcNow.Add(end - start);
+        }
 
         private static string? FormatDate(DateOnly? value) =>
             value?.ToString(DateFormat, CultureInfo.InvariantCulture);

@@ -1,12 +1,17 @@
 using JotaSystem.Sdk.Providers.Payments.Cielo.Models;
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
 namespace JotaSystem.Sdk.Providers.Payments.Cielo
 {
-    internal sealed class CieloProvider(IHttpClientFactory httpClientFactory, CieloOptions options) : ICieloProvider
+    internal sealed class CieloProvider(
+        IHttpClientFactory httpClientFactory,
+        CieloOptions options,
+        ICieloAuthTokenCache authTokenCache) : ICieloProvider
     {
         private const string SalesPath = "1/sales";
         private const string RecurrentPaymentPath = "1/RecurrentPayment";
@@ -14,6 +19,110 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
         private readonly CieloOptions _options = options;
+        private readonly ICieloAuthTokenCache _authTokenCache = authTokenCache;
+
+        public async Task<ApiResponse<CieloSilentOrderPostToken>> CreateSilentOrderPostTokenAsync(
+            CieloCredentials? credentials = null,
+            CancellationToken cancellationToken = default)
+        {
+            var selectedCredentials = ResolveCredentials(credentials);
+            if (selectedCredentials is null)
+                return ApiResponse<CieloSilentOrderPostToken>.CreateFail(MissingCredentialsMessage);
+
+            if (!selectedCredentials.SupportsSilentOrderPost)
+                return ApiResponse<CieloSilentOrderPostToken>.CreateFail(
+                    "ClientId e ClientSecret da Cielo nao foram configurados para o Silent Order Post.");
+
+            var authToken = await GetAuthTokenAsync(selectedCredentials, cancellationToken);
+            if (!authToken.Success)
+                return ApiResponse<CieloSilentOrderPostToken>.CreateFail(authToken.ErrorMessage!);
+
+            try
+            {
+                using var message = new HttpRequestMessage(HttpMethod.Post, SilentOrderPostUrl(selectedCredentials));
+                message.Headers.TryAddWithoutValidation("MerchantId", selectedCredentials.MerchantId);
+                message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken.Data);
+                message.Content = new StringContent(string.Empty, Encoding.UTF8, "application/json");
+
+                var client = _httpClientFactory.CreateClient(CieloHttpClientNames.Default);
+                using var response = await client.SendAsync(message, cancellationToken);
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                    return ApiResponse<CieloSilentOrderPostToken>.CreateFail(
+                        DescribeError(response.StatusCode, content));
+
+                var token = Deserialize<CieloSilentOrderPostToken>(content);
+                if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
+                    return ApiResponse<CieloSilentOrderPostToken>.CreateFail(InvalidResponseMessage);
+
+                token.ScriptUrl = SilentOrderPostScriptUrl(selectedCredentials);
+                token.Environment = selectedCredentials.Environment == CieloEnvironmentEnum.Production
+                    ? "production"
+                    : "sandbox";
+
+                return ApiResponse<CieloSilentOrderPostToken>.CreateSuccess(token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return ApiResponse<CieloSilentOrderPostToken>.CreateFail(TimeoutMessage);
+            }
+            catch (HttpRequestException ex)
+            {
+                return ApiResponse<CieloSilentOrderPostToken>.CreateFail(
+                    $"Falha na comunicacao com a Cielo: {ex.Message}");
+            }
+        }
+
+        private async Task<ApiResponse<string>> GetAuthTokenAsync(
+            CieloCredentials credentials,
+            CancellationToken cancellationToken)
+        {
+            var cacheKey = CreateCredentialKey(credentials);
+            var minimumExpiration = DateTimeOffset.UtcNow.Add(_options.AuthTokenExpirationMargin);
+
+            if (_authTokenCache.TryGet(cacheKey, minimumExpiration, out var cachedToken))
+                return ApiResponse<string>.CreateSuccess(cachedToken);
+
+            try
+            {
+                using var message = new HttpRequestMessage(HttpMethod.Post, AuthUrl(credentials));
+                var basicCredentials = Convert.ToBase64String(
+                    Encoding.UTF8.GetBytes($"{credentials.ClientId}:{credentials.ClientSecret}"));
+                message.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicCredentials);
+                message.Content = new FormUrlEncodedContent(
+                    [new KeyValuePair<string, string>("grant_type", "client_credentials")]);
+
+                var client = _httpClientFactory.CreateClient(CieloHttpClientNames.Default);
+                using var response = await client.SendAsync(message, cancellationToken);
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                    return ApiResponse<string>.CreateFail(
+                        $"Erro ao autenticar no Silent Order Post: {DescribeError(response.StatusCode, content)}");
+
+                var token = Deserialize<CieloAuthToken>(content);
+                if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
+                    return ApiResponse<string>.CreateFail(InvalidResponseMessage);
+
+                _authTokenCache.Set(cacheKey, token.AccessToken, DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn));
+                return ApiResponse<string>.CreateSuccess(token.AccessToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return ApiResponse<string>.CreateFail(TimeoutMessage);
+            }
+            catch (HttpRequestException ex)
+            {
+                return ApiResponse<string>.CreateFail($"Falha na comunicacao com a Cielo: {ex.Message}");
+            }
+        }
+
+        private static string CreateCredentialKey(CieloCredentials credentials)
+        {
+            var value = $"{credentials.ClientId}\n{credentials.ClientSecret}\n{credentials.Environment}";
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+        }
 
         public async Task<ApiResponse<CieloSaleResponse>> CreateSaleAsync(
             CieloSaleRequest request,
@@ -317,7 +426,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                return new CieloHttpResponse(false, string.Empty, "Tempo limite excedido na comunicacao com a Cielo.");
+                return new CieloHttpResponse(false, string.Empty, TimeoutMessage);
             }
             catch (HttpRequestException ex)
             {
@@ -393,6 +502,21 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
                 ? _options.ProductionTransactionUrl
                 : _options.SandboxTransactionUrl;
 
+        private string AuthUrl(CieloCredentials credentials) =>
+            credentials.Environment == CieloEnvironmentEnum.Production
+                ? _options.ProductionAuthUrl
+                : _options.SandboxAuthUrl;
+
+        private string SilentOrderPostUrl(CieloCredentials credentials) =>
+            credentials.Environment == CieloEnvironmentEnum.Production
+                ? _options.ProductionSilentOrderPostUrl
+                : _options.SandboxSilentOrderPostUrl;
+
+        private string SilentOrderPostScriptUrl(CieloCredentials credentials) =>
+            credentials.Environment == CieloEnvironmentEnum.Production
+                ? _options.ProductionSilentOrderPostScriptUrl
+                : _options.SandboxSilentOrderPostScriptUrl;
+
         private string QueryUrl(CieloCredentials credentials) =>
             credentials.Environment == CieloEnvironmentEnum.Production
                 ? _options.ProductionQueryUrl
@@ -446,7 +570,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             if (card is null)
                 return "Os dados do cartao sao obrigatorios.";
 
-            if (string.IsNullOrWhiteSpace(card.CardToken))
+            if (string.IsNullOrWhiteSpace(card.CardToken) && string.IsNullOrWhiteSpace(card.PaymentToken))
             {
                 if (string.IsNullOrWhiteSpace(card.CardNumber))
                     return "O numero do cartao e obrigatorio.";
@@ -483,6 +607,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         private const string MissingCredentialsMessage = "Credenciais da Cielo nao foram informadas.";
         private const string InvalidResponseMessage = "Resposta invalida retornada pela Cielo.";
+        private const string TimeoutMessage = "Tempo limite excedido na comunicacao com a Cielo.";
 
         private sealed record CieloHttpResponse(bool IsSuccess, string Content, string? ErrorMessage);
 

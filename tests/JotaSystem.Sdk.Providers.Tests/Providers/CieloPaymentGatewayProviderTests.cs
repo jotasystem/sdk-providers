@@ -103,6 +103,84 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task CreateAsync_Should_Authorize_With_The_Single_Use_Token_Alone()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""
+                {
+                    "MerchantOrderId": "PED00012",
+                    "Payment": {
+                        "PaymentId": "payment-id",
+                        "Type": "CreditCard",
+                        "Amount": 15700,
+                        "Status": 2,
+                        "ReturnMessage": "Operation Successful"
+                    }
+                }
+                """, HttpStatusCode.Created));
+            var provider = CreateGateway(handler);
+
+            var result = await provider.CreateAsync(
+                CreateRequest(
+                    CieloMethodCodes.CreditCard,
+                    card: new PaymentCard(SingleUseToken: "sop-payment-token", Brand: "Visa")),
+                TestContext.Current.CancellationToken);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(PaymentProviderStatusEnum.Paid, result.Status);
+
+            var content = handler.Requests[0].Content;
+            Assert.Contains("\"PaymentToken\":\"sop-payment-token\"", content);
+            Assert.Contains("\"Brand\":\"Visa\"", content);
+            Assert.DoesNotContain("CardNumber", content);
+            Assert.DoesNotContain("SecurityCode", content);
+        }
+
+        [Fact]
+        public async Task CreateCheckoutSessionAsync_Should_Open_A_Silent_Order_Post_Session()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""{"access_token":"oauth-token","expires_in":599}"""),
+                CreateResponse("""
+                {
+                    "AccessToken": "sop-access-token",
+                    "Issued": "2026-09-04T08:50:04",
+                    "ExpiresIn": "2026-09-04T09:10:04"
+                }
+                """, HttpStatusCode.Created));
+            var provider = CreateGateway(handler, options =>
+            {
+                options.DefaultCredentials!.ClientId = "client-id";
+                options.DefaultCredentials.ClientSecret = "client-secret";
+            });
+
+            var session = await provider.CreateCheckoutSessionAsync(
+                new PaymentCheckoutSessionRequest("cielo"),
+                TestContext.Current.CancellationToken);
+
+            Assert.True(session.IsSuccess);
+            Assert.Equal("sop-access-token", session.AccessToken);
+            Assert.Equal("sandbox", session.Environment);
+            Assert.EndsWith("silentorderpost-1.0.min.js", session.ScriptUrl);
+            Assert.NotNull(session.ExpiresAt);
+        }
+
+        [Fact]
+        public async Task CreateCheckoutSessionAsync_Should_Fail_Without_Oauth_Credentials()
+        {
+            var handler = new RecordingHttpMessageHandler();
+            var provider = CreateGateway(handler);
+
+            var session = await provider.CreateCheckoutSessionAsync(
+                new PaymentCheckoutSessionRequest("cielo"),
+                TestContext.Current.CancellationToken);
+
+            Assert.False(session.IsSuccess);
+            Assert.Null(session.AccessToken);
+            Assert.Empty(handler.Requests);
+        }
+
+        [Fact]
         public async Task CreateAsync_Should_Return_QrCode_For_Pix()
         {
             var handler = new RecordingHttpMessageHandler(
@@ -383,7 +461,7 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             var options = new CieloOptions { DefaultCredentials = CreateCredentials() };
             configure?.Invoke(options);
 
-            var cieloProvider = new CieloProvider(new TestHttpClientFactory(new HttpClient(handler)), options);
+            var cieloProvider = new CieloProvider(new TestHttpClientFactory(new HttpClient(handler)), options, new CieloAuthTokenCache());
             return new CieloPaymentGatewayProvider(cieloProvider, options);
         }
 
@@ -412,7 +490,7 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             public IPaymentGatewayProvider CreateWithoutDefaultCredentials()
             {
                 var options = new CieloOptions();
-                var cieloProvider = new CieloProvider(new TestHttpClientFactory(new HttpClient(handler)), options);
+                var cieloProvider = new CieloProvider(new TestHttpClientFactory(new HttpClient(handler)), options, new CieloAuthTokenCache());
                 return new CieloPaymentGatewayProvider(cieloProvider, options);
             }
         }

@@ -22,6 +22,21 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         public string ProductionTransactionUrl { get; set; } = "https://api.cieloecommerce.cielo.com.br/";
         public string ProductionQueryUrl { get; set; } = "https://apiquery.cieloecommerce.cielo.com.br/";
 
+        /// <summary>Autenticador OAuth2 usado para abrir a sessao do Silent Order Post.</summary>
+        public string SandboxAuthUrl { get; set; } = "https://authsandbox.braspag.com.br/oauth2/token";
+        public string ProductionAuthUrl { get; set; } = "https://auth.braspag.com.br/oauth2/token";
+
+        /// <summary>Emissor do AccessToken do Silent Order Post.</summary>
+        public string SandboxSilentOrderPostUrl { get; set; } = "https://transactionsandbox.pagador.com.br/post/api/public/v2/accesstoken";
+        public string ProductionSilentOrderPostUrl { get; set; } = "https://www.pagador.com.br/post/api/public/v2/accesstoken";
+
+        /// <summary>Script que captura o cartao no navegador do comprador.</summary>
+        public string SandboxSilentOrderPostScriptUrl { get; set; } = "https://transactionsandbox.pagador.com.br/post/Scripts/silentorderpost-1.0.min.js";
+        public string ProductionSilentOrderPostScriptUrl { get; set; } = "https://transactionscus.pagador.com.br/post/Scripts/silentorderpost-1.0.min.js";
+
+        /// <summary>Margem de renovacao do token OAuth2 antes do vencimento.</summary>
+        public TimeSpan AuthTokenExpirationMargin { get; set; } = TimeSpan.FromSeconds(30);
+
         public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
         /// <summary>Texto exibido na fatura do portador (maximo 13 caracteres).</summary>

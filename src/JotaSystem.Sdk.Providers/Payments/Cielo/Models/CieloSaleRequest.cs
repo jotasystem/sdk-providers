@@ -68,6 +68,12 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Models
     /// </summary>
     public class CieloCreditCardRequest
     {
+        /// <summary>
+        /// Token de uso unico devolvido pelo Silent Order Post, gerado no navegador do
+        /// comprador. Quando informado, substitui os demais dados do cartao.
+        /// </summary>
+        public string? PaymentToken { get; set; }
+
         public string? CardNumber { get; set; }
         public string? Holder { get; set; }
 

@@ -139,6 +139,99 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task CreateSilentOrderPostTokenAsync_Should_Authenticate_And_Return_The_Session()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""{"access_token":"oauth-token","token_type":"bearer","expires_in":599}"""),
+                CreateResponse("""
+                {
+                    "MerchantId": "merchant-id",
+                    "AccessToken": "sop-access-token",
+                    "Issued": "2026-09-04T08:50:04",
+                    "ExpiresIn": "2026-09-04T09:10:04"
+                }
+                """, HttpStatusCode.Created));
+            var provider = CreateProvider(handler, CreateSilentOrderPostCredentials());
+
+            var result = await provider.CreateSilentOrderPostTokenAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            Assert.True(result.Success);
+            Assert.Equal("sop-access-token", result.Data!.AccessToken);
+            Assert.Equal("sandbox", result.Data.Environment);
+            Assert.Equal(
+                "https://transactionsandbox.pagador.com.br/post/Scripts/silentorderpost-1.0.min.js",
+                result.Data.ScriptUrl);
+
+            var authRequest = handler.Requests[0];
+            Assert.Equal("https://authsandbox.braspag.com.br/oauth2/token", authRequest.Url);
+            Assert.Equal("grant_type=client_credentials", authRequest.Content);
+
+            var sopRequest = handler.Requests[1];
+            Assert.Equal(
+                "https://transactionsandbox.pagador.com.br/post/api/public/v2/accesstoken",
+                sopRequest.Url);
+            Assert.Equal("merchant-id", sopRequest.MerchantId);
+        }
+
+        [Fact]
+        public async Task CreateSilentOrderPostTokenAsync_Should_Reuse_The_Oauth_Token()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""{"access_token":"oauth-token","expires_in":599}"""),
+                CreateResponse("""{"AccessToken":"first"}""", HttpStatusCode.Created),
+                CreateResponse("""{"AccessToken":"second"}""", HttpStatusCode.Created));
+            var provider = CreateProvider(handler, CreateSilentOrderPostCredentials());
+
+            await provider.CreateSilentOrderPostTokenAsync(cancellationToken: TestContext.Current.CancellationToken);
+            await provider.CreateSilentOrderPostTokenAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+            Assert.Equal(3, handler.Requests.Count);
+            Assert.Single(handler.Requests, x => x.Url.Contains("oauth2/token"));
+        }
+
+        [Fact]
+        public async Task CreateSilentOrderPostTokenAsync_Should_Fail_Without_Oauth_Credentials()
+        {
+            var handler = new RecordingHttpMessageHandler();
+            var provider = CreateProvider(handler, CreateCredentials());
+
+            var result = await provider.CreateSilentOrderPostTokenAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            Assert.False(result.Success);
+            Assert.Contains("ClientId", result.ErrorMessage!);
+            Assert.Empty(handler.Requests);
+        }
+
+        [Fact]
+        public async Task CreateSaleAsync_Should_Accept_A_Card_With_Only_The_PaymentToken()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""{"Payment":{"PaymentId":"payment-id","Type":"CreditCard","Status":1}}""",
+                    HttpStatusCode.Created));
+            var provider = CreateProvider(handler, CreateCredentials());
+
+            var result = await provider.CreateSaleAsync(
+                new CieloSaleRequest
+                {
+                    MerchantOrderId = "Pedido123",
+                    Payment = new CieloPaymentRequest
+                    {
+                        Type = CieloPaymentTypes.CreditCard,
+                        Amount = 15700,
+                        Installments = 1,
+                        CreditCard = new CieloCreditCardRequest { PaymentToken = "payment-token" }
+                    }
+                },
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            Assert.True(result.Success);
+            Assert.Contains("\"PaymentToken\":\"payment-token\"", handler.Requests[0].Content);
+            Assert.DoesNotContain("CardNumber", handler.Requests[0].Content);
+        }
+
+        [Fact]
         public async Task VoidAsync_Should_Send_Amount_On_Query_String()
         {
             var handler = new RecordingHttpMessageHandler(
@@ -267,10 +360,20 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
 
         internal static CieloProvider CreateProvider(HttpMessageHandler handler, CieloCredentials? defaultCredentials) =>
             new(new TestHttpClientFactory(new HttpClient(handler)),
-                new CieloOptions { DefaultCredentials = defaultCredentials });
+                new CieloOptions { DefaultCredentials = defaultCredentials },
+                new CieloAuthTokenCache());
 
         internal static CieloCredentials CreateCredentials() =>
             new() { MerchantId = "merchant-id", MerchantKey = "merchant-key" };
+
+        internal static CieloCredentials CreateSilentOrderPostCredentials() =>
+            new()
+            {
+                MerchantId = "merchant-id",
+                MerchantKey = "merchant-key",
+                ClientId = "client-id",
+                ClientSecret = "client-secret"
+            };
 
         internal static HttpResponseMessage CreateResponse(
             string content,
