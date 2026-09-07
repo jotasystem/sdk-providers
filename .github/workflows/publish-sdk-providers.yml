@@ -63,7 +63,7 @@ jobs:
 
       - name: 6️⃣ Executar testes
         if: steps.check.outputs.exists == 'false'
-        run: dotnet run --project ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore
+        run: dotnet run --project ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }}
 
       - name: 7️⃣ Build do projeto
         if: steps.check.outputs.exists == 'false'
