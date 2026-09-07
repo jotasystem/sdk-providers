@@ -7,6 +7,12 @@ namespace JotaSystem.Sdk.Providers.Payments
         string ProviderKey { get; }
 
         /// <summary>
+        /// Meios de pagamento oferecidos pelo gateway, publicados para que o sistema
+        /// consumidor monte a configuracao da forma de pagamento.
+        /// </summary>
+        IReadOnlyList<PaymentMethodOption> SupportedMethods => [];
+
+        /// <summary>
         /// Abre uma sessao de checkout para captura do cartao no navegador do comprador.
         /// Gateways sem esse recurso mantem a implementacao padrao.
         /// </summary>

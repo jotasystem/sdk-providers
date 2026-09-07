@@ -21,6 +21,18 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         public string ProviderKey => "cielo";
 
+        public IReadOnlyList<PaymentMethodOption> SupportedMethods { get; } =
+        [
+            new(CieloMethodCodes.CreditCard, "Cartão de crédito",
+                "Autorização à vista ou parcelada, com captura automática."),
+            new(CieloMethodCodes.RecurrentCreditCard, "Cartão de crédito (recorrente)",
+                "A Cielo agenda e repete a cobrança na periodicidade contratada."),
+            new(CieloMethodCodes.Pix, "Pix",
+                "QR Code com confirmação automática por notificação."),
+            new(CieloMethodCodes.Boleto, "Boleto",
+                "Boleto registrado no banco emissor configurado na integração.")
+        ];
+
         public async Task<PaymentCheckoutSession> CreateCheckoutSessionAsync(
             PaymentCheckoutSessionRequest request,
             CancellationToken cancellationToken = default)
@@ -404,27 +416,35 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
                 : reference;
         }
 
+        /// <summary>
+        /// Monta as credenciais campo a campo: o que a integracao do tenant informa tem
+        /// prioridade e o que faltar vem da configuracao padrao da aplicacao.
+        /// </summary>
         private CieloCredentials? ResolveCredentials(PaymentProviderContext? context, CieloIntegrationConfig config)
         {
-            var credentials = ResolveNamedCredentials(context?.SecretReference)
-                ?? BuildCredentials(config, context?.SecretReference)
-                ?? _options.DefaultCredentials;
+            var secrets = context?.Secrets;
+            var named = ResolveNamedCredentials(context?.SecretReference);
+            var fallback = named ?? _options.DefaultCredentials;
 
-            if (credentials is null ||
-                string.IsNullOrWhiteSpace(credentials.MerchantId) ||
-                string.IsNullOrWhiteSpace(credentials.MerchantKey))
+            // A SecretReference so vale como MerchantKey quando nao aponta para uma credencial nomeada.
+            var legacyMerchantKey = named is null ? context?.SecretReference : null;
+
+            var merchantId = FirstFilled(Read(secrets, CieloSecretKeys.MerchantId), config.MerchantId, fallback?.MerchantId);
+            var merchantKey = FirstFilled(Read(secrets, CieloSecretKeys.MerchantKey), config.MerchantKey, legacyMerchantKey, fallback?.MerchantKey);
+
+            if (merchantId is null || merchantKey is null)
                 return null;
 
-            var environment = ResolveEnvironment(context?.Environment) ?? credentials.Environment;
-
-            return environment == credentials.Environment
-                ? credentials
-                : new CieloCredentials
-                {
-                    MerchantId = credentials.MerchantId,
-                    MerchantKey = credentials.MerchantKey,
-                    Environment = environment
-                };
+            return new CieloCredentials
+            {
+                MerchantId = merchantId,
+                MerchantKey = merchantKey,
+                ClientId = FirstFilled(Read(secrets, CieloSecretKeys.ClientId), config.ClientId, fallback?.ClientId),
+                ClientSecret = FirstFilled(Read(secrets, CieloSecretKeys.ClientSecret), fallback?.ClientSecret),
+                Environment = ResolveEnvironment(context?.Environment)
+                    ?? fallback?.Environment
+                    ?? CieloEnvironmentEnum.Sandbox
+            };
         }
 
         private CieloCredentials? ResolveNamedCredentials(string? secretReference) =>
@@ -433,14 +453,8 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
                 ? credentials
                 : null;
 
-        private static CieloCredentials? BuildCredentials(CieloIntegrationConfig config, string? secretReference)
-        {
-            var merchantKey = config.MerchantKey ?? secretReference?.Trim();
-
-            return string.IsNullOrWhiteSpace(config.MerchantId) || string.IsNullOrWhiteSpace(merchantKey)
-                ? null
-                : new CieloCredentials { MerchantId = config.MerchantId, MerchantKey = merchantKey };
-        }
+        private static string? FirstFilled(params string?[] values) =>
+            Array.Find(values, x => !string.IsNullOrWhiteSpace(x))?.Trim();
 
         private static CieloEnvironmentEnum? ResolveEnvironment(string? environment) =>
             environment?.Trim().ToLowerInvariant() switch

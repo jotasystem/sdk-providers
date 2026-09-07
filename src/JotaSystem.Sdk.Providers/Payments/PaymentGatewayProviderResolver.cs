@@ -7,11 +7,17 @@ namespace JotaSystem.Sdk.Providers.Payments
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(providerKey);
 
-            var provider = providers.SingleOrDefault(x =>
-                string.Equals(x.ProviderKey, providerKey.Trim(), StringComparison.OrdinalIgnoreCase));
-
-            return provider ?? throw new InvalidOperationException(
+            return Find(providerKey) ?? throw new InvalidOperationException(
                 $"Payment gateway provider '{providerKey}' is not registered.");
+        }
+
+        public IPaymentGatewayProvider? Find(string providerKey)
+        {
+            if (string.IsNullOrWhiteSpace(providerKey))
+                return null;
+
+            return providers.SingleOrDefault(x =>
+                string.Equals(x.ProviderKey, providerKey.Trim(), StringComparison.OrdinalIgnoreCase));
         }
     }
 }

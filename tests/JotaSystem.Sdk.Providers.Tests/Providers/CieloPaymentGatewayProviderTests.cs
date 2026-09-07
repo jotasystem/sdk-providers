@@ -352,6 +352,74 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task CreateAsync_Should_Prefer_The_Tenant_Secrets_Over_The_Application_Defaults()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""{"Payment":{"PaymentId":"payment-id","Type":"Pix","Status":12}}""",
+                    HttpStatusCode.Created));
+            var provider = CreateGateway(handler);
+
+            var request = CreateRequest(CieloMethodCodes.Pix) with
+            {
+                Context = new PaymentProviderContext(
+                    "production",
+                    """{ "merchantId": "loja-merchant-id" }""",
+                    Secrets: new Dictionary<string, string>
+                    {
+                        [CieloSecretKeys.MerchantKey] = "loja-merchant-key"
+                    })
+            };
+
+            var result = await provider.CreateAsync(request, TestContext.Current.CancellationToken);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal("loja-merchant-id", handler.Requests[0].MerchantId);
+            Assert.Equal("loja-merchant-key", handler.Requests[0].MerchantKey);
+            Assert.StartsWith("https://api.cieloecommerce.cielo.com.br/", handler.Requests[0].Url);
+        }
+
+        [Fact]
+        public async Task CreateCheckoutSessionAsync_Should_Complete_Tenant_Secrets_With_The_Application_Defaults()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""{"access_token":"oauth-token","expires_in":599}"""),
+                CreateResponse("""{"AccessToken":"sop-access-token"}""", HttpStatusCode.Created));
+            var provider = CreateGateway(handler, options =>
+            {
+                options.DefaultCredentials!.ClientId = "client-id-do-appsettings";
+                options.DefaultCredentials.ClientSecret = "client-secret-do-appsettings";
+            });
+
+            var session = await provider.CreateCheckoutSessionAsync(
+                new PaymentCheckoutSessionRequest(
+                    "cielo",
+                    Context: new PaymentProviderContext(
+                        "sandbox",
+                        Secrets: new Dictionary<string, string>
+                        {
+                            [CieloSecretKeys.MerchantId] = "loja-merchant-id",
+                            [CieloSecretKeys.MerchantKey] = "loja-merchant-key"
+                        })),
+                TestContext.Current.CancellationToken);
+
+            Assert.True(session.IsSuccess);
+            Assert.Equal("loja-merchant-id", handler.Requests[1].MerchantId);
+        }
+
+        [Fact]
+        public void SupportedMethods_Should_Publish_The_Four_Cielo_Methods()
+        {
+            var provider = CreateGateway(new RecordingHttpMessageHandler());
+
+            var codes = provider.SupportedMethods.Select(x => x.Code).ToArray();
+
+            Assert.Equal(
+                [CieloMethodCodes.CreditCard, CieloMethodCodes.RecurrentCreditCard, CieloMethodCodes.Pix, CieloMethodCodes.Boleto],
+                codes);
+            Assert.All(provider.SupportedMethods, x => Assert.False(string.IsNullOrWhiteSpace(x.Name)));
+        }
+
+        [Fact]
         public async Task CancelAsync_Should_Void_The_Transaction()
         {
             var handler = new RecordingHttpMessageHandler(

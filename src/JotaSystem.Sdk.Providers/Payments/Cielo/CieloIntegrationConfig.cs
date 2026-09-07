@@ -11,6 +11,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         internal string? MerchantId { get; private set; }
         internal string? MerchantKey { get; private set; }
+        internal string? ClientId { get; private set; }
         internal string? SoftDescriptor { get; private set; }
         internal string? BoletoProvider { get; private set; }
         internal string? BoletoAssignor { get; private set; }
@@ -37,6 +38,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
                 {
                     MerchantId = ReadString(root, "merchantId"),
                     MerchantKey = ReadString(root, "merchantKey"),
+                    ClientId = ReadString(root, "clientId"),
                     SoftDescriptor = ReadString(root, "softDescriptor"),
                     BoletoProvider = ReadString(root, "boletoProvider"),
                     BoletoAssignor = ReadString(root, "boletoAssignor"),
