@@ -1,4 +1,5 @@
 using JotaSystem.Sdk.Providers.Payments.Cielo;
+using JotaSystem.Sdk.Providers.Payments.Cielo.Link;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JotaSystem.Sdk.Providers.Payments
@@ -12,9 +13,10 @@ namespace JotaSystem.Sdk.Providers.Payments
         }
 
         /// <summary>
-        /// Registra a integracao com a API E-commerce da Cielo, disponivel tanto pelo
-        /// contrato de gateway (<see cref="IPaymentGatewayProvider"/>, chave <c>cielo</c>)
-        /// quanto pelo contrato completo da Cielo (<see cref="ICieloProvider"/>).
+        /// Registra as integracoes com a Cielo — a API E-commerce e a API Link de Pagamento —
+        /// disponiveis tanto pelo contrato de gateway (<see cref="IPaymentGatewayProvider"/>,
+        /// chave <c>cielo</c>) quanto pelos contratos completos de cada API
+        /// (<see cref="ICieloProvider"/> e <see cref="ICieloLinkProvider"/>).
         /// </summary>
         public static JotaSystemSdkBuilder AddCielo(this JotaSystemSdkBuilder builder, Action<CieloOptions>? configure = null)
         {
@@ -31,6 +33,7 @@ namespace JotaSystem.Sdk.Providers.Payments
             });
 
             builder.Services.AddScoped<ICieloProvider, CieloProvider>();
+            builder.Services.AddScoped<ICieloLinkProvider, CieloLinkProvider>();
             builder.Services.AddScoped<IPaymentGatewayProvider, CieloPaymentGatewayProvider>();
 
             return builder;

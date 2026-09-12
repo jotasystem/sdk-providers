@@ -11,5 +11,14 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         public const string MerchantKey = "merchantKey";
         public const string ClientId = "clientId";
         public const string ClientSecret = "clientSecret";
+
+        /// <summary>
+        /// ClientId da API Link de Pagamento, gerado no Backoffice em E-commerce &gt; Link de
+        /// Pagamento &gt; Configuracoes &gt; Credenciais da API. Nao e o do Silent Order Post.
+        /// </summary>
+        public const string LinkClientId = "linkClientId";
+
+        /// <summary>ClientSecret da API Link de Pagamento, par do <see cref="LinkClientId"/>.</summary>
+        public const string LinkClientSecret = "linkClientSecret";
     }
 }

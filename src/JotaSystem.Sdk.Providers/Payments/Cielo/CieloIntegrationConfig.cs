@@ -21,6 +21,15 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         internal string? WebhookHeaderName { get; private set; }
         internal bool? Capture { get; private set; }
         internal int? BoletoExpirationDays { get; private set; }
+        internal string? LinkClientId { get; private set; }
+        internal string? LinkProductType { get; private set; }
+        internal string? LinkShippingType { get; private set; }
+
+        /// <summary>Meios de pagamento do link, separados por virgula.</summary>
+        internal string? LinkPaymentTypes { get; private set; }
+
+        internal int? LinkMaxInstallments { get; private set; }
+        internal int? LinkExpirationDays { get; private set; }
 
         internal static CieloIntegrationConfig Parse(string? json)
         {
@@ -47,7 +56,13 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
                     RecurrenceInterval = ReadString(root, "recurrenceInterval"),
                     WebhookHeaderName = ReadString(root, "webhookHeaderName"),
                     Capture = ReadBoolean(root, "capture"),
-                    BoletoExpirationDays = ReadInteger(root, "boletoExpirationDays")
+                    BoletoExpirationDays = ReadInteger(root, "boletoExpirationDays"),
+                    LinkClientId = ReadString(root, "linkClientId"),
+                    LinkProductType = ReadString(root, "linkProductType"),
+                    LinkShippingType = ReadString(root, "linkShippingType"),
+                    LinkPaymentTypes = ReadString(root, "linkPaymentTypes"),
+                    LinkMaxInstallments = ReadInteger(root, "linkMaxInstallments"),
+                    LinkExpirationDays = ReadInteger(root, "linkExpirationDays")
                 };
             }
             catch (JsonException)

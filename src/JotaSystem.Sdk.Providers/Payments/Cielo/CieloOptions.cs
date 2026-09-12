@@ -1,9 +1,12 @@
+using JotaSystem.Sdk.Providers.Payments.Cielo.Link;
+using JotaSystem.Sdk.Providers.Payments.Cielo.Link.Models;
 using JotaSystem.Sdk.Providers.Payments.Cielo.Models;
 
 namespace JotaSystem.Sdk.Providers.Payments.Cielo
 {
     /// <summary>
-    /// Configuracao da integracao com a API E-commerce da Cielo.
+    /// Configuracao da integracao com as APIs da Cielo: a API E-commerce e a API Link de
+    /// Pagamento, que tem credenciais e endereco proprios.
     /// </summary>
     public class CieloOptions
     {
@@ -68,5 +71,41 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         /// Quando informado, o webhook so e aceito se o header chegar com o segredo esperado.
         /// </summary>
         public string? WebhookHeaderName { get; set; }
+
+        /// <summary>
+        /// Credenciais padrao da API Link de Pagamento, usadas quando a integracao do tenant
+        /// nao informa as proprias.
+        /// </summary>
+        public CieloLinkCredentials? DefaultLinkCredentials { get; set; }
+
+        /// <summary>
+        /// Endereco da API Link de Pagamento. O produto nao tem ambiente de sandbox: o teste
+        /// e feito ligando o modo de teste da loja no Backoffice Cielo.
+        /// </summary>
+        public string LinkApiUrl { get; set; } = "https://cieloecommerce.cielo.com.br/";
+
+        /// <summary>Natureza padrao do link. Ver <see cref="CieloLinkProductTypes"/>.</summary>
+        public string LinkProductType { get; set; } = CieloLinkProductTypes.Payment;
+
+        /// <summary>Frete padrao do link. Ver <see cref="CieloLinkShippingTypes"/>.</summary>
+        public string LinkShippingType { get; set; } = CieloLinkShippingTypes.WithoutShipping;
+
+        /// <summary>
+        /// Prazo padrao de expiracao do link, em dias, quando a cobranca nao informa um.
+        /// Sem valor, o link nao expira.
+        /// </summary>
+        public int? LinkExpirationDays { get; set; }
+
+        /// <summary>
+        /// Numero maximo de parcelas oferecido na pagina do link. Sem valor, vale o que
+        /// estiver configurado na loja.
+        /// </summary>
+        public int? LinkMaxInstallments { get; set; }
+
+        /// <summary>
+        /// Meios de pagamento liberados na pagina do link. Vazio mantem a configuracao da
+        /// loja. Ver <see cref="CieloLinkPaymentTypes"/>.
+        /// </summary>
+        public IList<string> LinkPaymentTypes { get; } = [];
     }
 }

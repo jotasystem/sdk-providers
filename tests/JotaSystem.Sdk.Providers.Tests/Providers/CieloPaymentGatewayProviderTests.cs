@@ -2,6 +2,7 @@ using JotaSystem.Sdk.Core.CrossCutting.Providers.Enum;
 using JotaSystem.Sdk.Core.CrossCutting.Providers.Models;
 using JotaSystem.Sdk.Providers.Payments;
 using JotaSystem.Sdk.Providers.Payments.Cielo;
+using JotaSystem.Sdk.Providers.Payments.Cielo.Link;
 using System.Net;
 using static JotaSystem.Sdk.Providers.Tests.Providers.CieloProviderTests;
 
@@ -407,14 +408,20 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
-        public void SupportedMethods_Should_Publish_The_Four_Cielo_Methods()
+        public void SupportedMethods_Should_Publish_The_Cielo_Methods()
         {
             var provider = CreateGateway(new RecordingHttpMessageHandler());
 
             var codes = provider.SupportedMethods.Select(x => x.Code).ToArray();
 
             Assert.Equal(
-                [CieloMethodCodes.CreditCard, CieloMethodCodes.RecurrentCreditCard, CieloMethodCodes.Pix, CieloMethodCodes.Boleto],
+                [
+                    CieloMethodCodes.CreditCard,
+                    CieloMethodCodes.RecurrentCreditCard,
+                    CieloMethodCodes.Pix,
+                    CieloMethodCodes.Boleto,
+                    CieloMethodCodes.PaymentLink
+                ],
                 codes);
             Assert.All(provider.SupportedMethods, x => Assert.False(string.IsNullOrWhiteSpace(x.Name)));
         }
@@ -529,8 +536,11 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             var options = new CieloOptions { DefaultCredentials = CreateCredentials() };
             configure?.Invoke(options);
 
-            var cieloProvider = new CieloProvider(new TestHttpClientFactory(new HttpClient(handler)), options, new CieloAuthTokenCache());
-            return new CieloPaymentGatewayProvider(cieloProvider, options);
+            var httpClientFactory = new TestHttpClientFactory(new HttpClient(handler));
+            var authTokenCache = new CieloAuthTokenCache();
+            var cieloProvider = new CieloProvider(httpClientFactory, options, authTokenCache);
+            var linkProvider = new CieloLinkProvider(httpClientFactory, options, authTokenCache);
+            return new CieloPaymentGatewayProvider(cieloProvider, linkProvider, options);
         }
 
         private static PaymentProviderRequest CreateRequest(
@@ -558,8 +568,11 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             public IPaymentGatewayProvider CreateWithoutDefaultCredentials()
             {
                 var options = new CieloOptions();
-                var cieloProvider = new CieloProvider(new TestHttpClientFactory(new HttpClient(handler)), options, new CieloAuthTokenCache());
-                return new CieloPaymentGatewayProvider(cieloProvider, options);
+                var httpClientFactory = new TestHttpClientFactory(new HttpClient(handler));
+                var authTokenCache = new CieloAuthTokenCache();
+                var cieloProvider = new CieloProvider(httpClientFactory, options, authTokenCache);
+                var linkProvider = new CieloLinkProvider(httpClientFactory, options, authTokenCache);
+                return new CieloPaymentGatewayProvider(cieloProvider, linkProvider, options);
             }
         }
     }

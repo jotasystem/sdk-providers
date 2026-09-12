@@ -8,7 +8,13 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         CreditCard = 0,
         RecurrentCreditCard = 1,
         Pix = 2,
-        Boleto = 3
+        Boleto = 3,
+
+        /// <summary>
+        /// Pagina de pagamento hospedada pela Cielo e enviada como link ao pagador. E a
+        /// opcao em que o proprio pagador escolhe o meio e digita o cartao.
+        /// </summary>
+        PaymentLink = 4
     }
 
     /// <summary>
@@ -21,6 +27,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         public const string RecurrentCreditCard = "credit_card_recurrent";
         public const string Pix = "pix";
         public const string Boleto = "boleto";
+        public const string PaymentLink = "payment_link";
 
         private static readonly Dictionary<string, CieloPaymentMethodEnum> _methods =
             new(StringComparer.OrdinalIgnoreCase)
@@ -40,7 +47,13 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
                 [Boleto] = CieloPaymentMethodEnum.Boleto,
                 ["boleto_bancario"] = CieloPaymentMethodEnum.Boleto,
-                ["bank_slip"] = CieloPaymentMethodEnum.Boleto
+                ["bank_slip"] = CieloPaymentMethodEnum.Boleto,
+
+                [PaymentLink] = CieloPaymentMethodEnum.PaymentLink,
+                ["link"] = CieloPaymentMethodEnum.PaymentLink,
+                ["link_de_pagamento"] = CieloPaymentMethodEnum.PaymentLink,
+                ["link_pagamento"] = CieloPaymentMethodEnum.PaymentLink,
+                ["checkout"] = CieloPaymentMethodEnum.PaymentLink
             };
 
         /// <summary>

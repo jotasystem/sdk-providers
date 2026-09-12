@@ -1,22 +1,33 @@
 using JotaSystem.Sdk.Core.CrossCutting.Providers.Enum;
 using JotaSystem.Sdk.Core.CrossCutting.Providers.Models;
+using JotaSystem.Sdk.Providers.Payments.Cielo.Link;
+using JotaSystem.Sdk.Providers.Payments.Cielo.Link.Models;
 using JotaSystem.Sdk.Providers.Payments.Cielo.Models;
 using System.Globalization;
 
 namespace JotaSystem.Sdk.Providers.Payments.Cielo
 {
     /// <summary>
-    /// Adapta a API E-commerce da Cielo ao contrato de gateway de pagamento do SDK.
+    /// Adapta as APIs da Cielo ao contrato de gateway de pagamento do SDK: a API E-commerce
+    /// atende cartao, Pix e boleto e a API Link de Pagamento atende o meio
+    /// <see cref="CieloMethodCodes.PaymentLink"/>.
     /// </summary>
-    internal sealed class CieloPaymentGatewayProvider(ICieloProvider cieloProvider, CieloOptions options)
+    internal sealed class CieloPaymentGatewayProvider(
+        ICieloProvider cieloProvider,
+        ICieloLinkProvider cieloLinkProvider,
+        CieloOptions options)
         : IPaymentGatewayProvider
     {
         private const string DateFormat = "yyyy-MM-dd";
         private const string ReceivedDateFormat = "yyyy-MM-dd HH:mm:ss";
         private const int SoftDescriptorMaxLength = 13;
         private const int MerchantOrderIdMaxLength = 50;
+        private const int LinkNameMaxLength = 128;
+        private const int LinkOrderNumberMaxLength = 20;
+        private const int LinkMaxInstallments = 18;
 
         private readonly ICieloProvider _cieloProvider = cieloProvider;
+        private readonly ICieloLinkProvider _cieloLinkProvider = cieloLinkProvider;
         private readonly CieloOptions _options = options;
 
         public string ProviderKey => "cielo";
@@ -24,13 +35,15 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         public IReadOnlyList<PaymentMethodOption> SupportedMethods { get; } =
         [
             new(CieloMethodCodes.CreditCard, "Cartão de crédito",
-                "Autorização à vista ou parcelada, com captura automática."),
+                "Autorização à vista ou parcelada, com captura automática.", RequiresCard: true),
             new(CieloMethodCodes.RecurrentCreditCard, "Cartão de crédito (recorrente)",
-                "A Cielo agenda e repete a cobrança na periodicidade contratada."),
+                "A Cielo agenda e repete a cobrança na periodicidade contratada.", RequiresCard: true),
             new(CieloMethodCodes.Pix, "Pix",
                 "QR Code com confirmação automática por notificação."),
             new(CieloMethodCodes.Boleto, "Boleto",
-                "Boleto registrado no banco emissor configurado na integração.")
+                "Boleto registrado no banco emissor configurado na integração."),
+            new(CieloMethodCodes.PaymentLink, "Link de pagamento",
+                "Página hospedada pela Cielo: o cliente escolhe o meio e informa o cartão.")
         ];
 
         public async Task<PaymentCheckoutSession> CreateCheckoutSessionAsync(
@@ -60,12 +73,16 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             CancellationToken cancellationToken = default)
         {
             var config = CieloIntegrationConfig.Parse(request.Context?.PublicConfigJson);
-            var credentials = ResolveCredentials(request.Context, config);
-            if (credentials is null)
-                return Failure(MissingCredentialsMessage);
 
             if (!CieloMethodCodes.TryResolve(request.MethodCode, out var method))
                 return Failure($"O metodo de pagamento '{request.MethodCode}' nao e suportado pela Cielo.");
+
+            if (method == CieloPaymentMethodEnum.PaymentLink)
+                return await CreatePaymentLinkAsync(request, config, cancellationToken);
+
+            var credentials = ResolveCredentials(request.Context, config);
+            if (credentials is null)
+                return Failure(MissingCredentialsMessage);
 
             var response = await _cieloProvider.CreateSaleAsync(
                 BuildSale(request, method, config),
@@ -82,6 +99,10 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             CancellationToken cancellationToken = default)
         {
             var config = CieloIntegrationConfig.Parse(query.Context?.PublicConfigJson);
+
+            if (IsPaymentLink(query.MethodCode))
+                return await GetPaymentLinkAsync(query, config, cancellationToken);
+
             var credentials = ResolveCredentials(query.Context, config);
             if (credentials is null)
                 return Failure(MissingCredentialsMessage);
@@ -98,6 +119,16 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             CancellationToken cancellationToken = default)
         {
             var config = CieloIntegrationConfig.Parse(operation.Context?.PublicConfigJson);
+
+            if (IsPaymentLink(operation.MethodCode))
+                return await CancelPaymentLinkAsync(
+                    operation.Context,
+                    config,
+                    operation.TransactionId,
+                    amount: null,
+                    PaymentProviderStatusEnum.Cancelled,
+                    cancellationToken);
+
             var credentials = ResolveCredentials(operation.Context, config);
             if (credentials is null)
                 return Failure(MissingCredentialsMessage);
@@ -118,6 +149,16 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             CancellationToken cancellationToken = default)
         {
             var config = CieloIntegrationConfig.Parse(operation.Context?.PublicConfigJson);
+
+            if (IsPaymentLink(operation.MethodCode))
+                return await CancelPaymentLinkAsync(
+                    operation.Context,
+                    config,
+                    operation.TransactionId,
+                    operation.Amount.HasValue ? ToCents(operation.Amount.Value) : null,
+                    PaymentProviderStatusEnum.Refunded,
+                    cancellationToken);
+
             var credentials = ResolveCredentials(operation.Context, config);
             if (credentials is null)
                 return Failure(MissingCredentialsMessage);
@@ -138,6 +179,13 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             CancellationToken cancellationToken = default)
         {
             var config = CieloIntegrationConfig.Parse(request.Context?.PublicConfigJson);
+
+            // As duas APIs postam na mesma URL: o Link de Pagamento manda o pedido do
+            // Checkout Cielo e a API E-commerce manda o PaymentId da transacao.
+            var linkNotification = CieloLinkNotification.TryParse(request.Payload);
+            if (linkNotification is not null)
+                return await ParseLinkWebhookAsync(request, config, linkNotification, cancellationToken);
+
             var credentials = ResolveCredentials(request.Context, config)
                 ?? throw new InvalidOperationException(MissingCredentialsMessage);
 
@@ -195,6 +243,402 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
             if (!isTrusted)
                 throw new InvalidOperationException("Notificacao da Cielo sem o segredo configurado.");
+        }
+
+        private async Task<PaymentProviderResult> CreatePaymentLinkAsync(
+            PaymentProviderRequest request,
+            CieloIntegrationConfig config,
+            CancellationToken cancellationToken)
+        {
+            var credentials = ResolveLinkCredentials(request.Context, config);
+            if (credentials is null)
+                return Failure(MissingLinkCredentialsMessage);
+
+            var response = await _cieloLinkProvider.CreateLinkAsync(
+                BuildLink(request, config),
+                credentials,
+                cancellationToken);
+
+            return response.Success
+                ? MapCreatedLink(response.Data!)
+                : Failure(response.ErrorMessage!);
+        }
+
+        /// <summary>
+        /// O link so vira transacao quando alguem paga. Enquanto nao ha pedido, a cobranca
+        /// segue pendente e o que interessa devolver e a propria URL de pagamento.
+        /// </summary>
+        private async Task<PaymentProviderResult> GetPaymentLinkAsync(
+            PaymentProviderQuery query,
+            CieloIntegrationConfig config,
+            CancellationToken cancellationToken)
+        {
+            var credentials = ResolveLinkCredentials(query.Context, config);
+            if (credentials is null)
+                return Failure(MissingLinkCredentialsMessage);
+
+            var orders = await _cieloLinkProvider.GetLinkOrdersAsync(
+                query.TransactionId,
+                credentials,
+                cancellationToken);
+            if (!orders.Success)
+                return Failure(orders.ErrorMessage!);
+
+            var order = SelectRelevantOrder(orders.Data!);
+            if (order is not null)
+                return MapLinkOrder(query.TransactionId, order, orders.Data!.RawPayload, isSuccess: true);
+
+            var link = await _cieloLinkProvider.GetLinkAsync(query.TransactionId, credentials, cancellationToken);
+
+            return link.Success
+                ? MapCreatedLink(link.Data!)
+                : Failure(link.ErrorMessage!);
+        }
+
+        /// <summary>
+        /// Sem pedido pago, cancelar e apagar o link para que ninguem mais consiga paga-lo.
+        /// Com pedido, o cancelamento vai para o pedido do Checkout Cielo.
+        /// </summary>
+        private async Task<PaymentProviderResult> CancelPaymentLinkAsync(
+            PaymentProviderContext? context,
+            CieloIntegrationConfig config,
+            string linkId,
+            long? amount,
+            PaymentProviderStatusEnum expectedStatus,
+            CancellationToken cancellationToken)
+        {
+            var credentials = ResolveLinkCredentials(context, config);
+            if (credentials is null)
+                return Failure(MissingLinkCredentialsMessage);
+
+            var orders = await _cieloLinkProvider.GetLinkOrdersAsync(linkId, credentials, cancellationToken);
+            if (!orders.Success)
+                return Failure(orders.ErrorMessage!);
+
+            var order = SelectRelevantOrder(orders.Data!);
+            var checkoutOrderNumber = ResolveCheckoutOrderNumber(order);
+
+            if (checkoutOrderNumber is null)
+            {
+                var deleted = await _cieloLinkProvider.DeleteLinkAsync(linkId, credentials, cancellationToken);
+
+                return deleted.Success
+                    ? new PaymentProviderResult(
+                        IsSuccess: true,
+                        Status: PaymentProviderStatusEnum.Cancelled,
+                        TransactionId: linkId,
+                        Message: "Link de pagamento cancelado antes de qualquer pagamento.")
+                    : Failure(deleted.ErrorMessage!);
+            }
+
+            var response = await _cieloLinkProvider.VoidOrderAsync(
+                checkoutOrderNumber,
+                amount,
+                credentials,
+                cancellationToken);
+            if (!response.Success)
+                return Failure(response.ErrorMessage!);
+
+            var operation = response.Data!;
+
+            return new PaymentProviderResult(
+                IsSuccess: true,
+                Status: expectedStatus,
+                TransactionId: linkId,
+                Reference: checkoutOrderNumber,
+                Message: operation.ReturnMessage,
+                RawPayload: operation.RawPayload,
+                Metadata: new Dictionary<string, string>
+                {
+                    [CieloLinkMetadata.CheckoutOrderNumber] = checkoutOrderNumber,
+                    ["return_code"] = operation.ReturnCode ?? string.Empty
+                });
+        }
+
+        /// <summary>
+        /// A notificacao do Link nao e assinada, entao o status e confirmado na consulta do
+        /// pedido sempre que ela responde. Quando a consulta falha, vale o que a Cielo postou.
+        /// </summary>
+        private async Task<PaymentWebhookEvent> ParseLinkWebhookAsync(
+            PaymentWebhookRequest request,
+            CieloIntegrationConfig config,
+            CieloLinkNotification notification,
+            CancellationToken cancellationToken)
+        {
+            EnsureWebhookIsTrusted(request, config);
+
+            var linkId = notification.ProductId
+                ?? throw new InvalidOperationException("Notificacao do Link de Pagamento sem o identificador do link.");
+            var credentials = ResolveLinkCredentials(request.Context, config);
+            var confirmed = await ConfirmLinkOrderAsync(notification, credentials, cancellationToken);
+
+            var status = MapLinkStatus(confirmed?.Payment?.Status ?? notification.PaymentStatus);
+            var amount = confirmed?.Payment?.Price ?? notification.Amount;
+            var metadata = BuildLinkMetadata(notification, confirmed);
+
+            return new PaymentWebhookEvent(
+                ProviderKey,
+                $"{notification.CheckoutCieloOrderNumber ?? linkId}-{status}",
+                $"payment.{status.ToString().ToLowerInvariant()}",
+                linkId,
+                status,
+                amount.HasValue ? FromCents(amount.Value) : null,
+                Currency: null,
+                notification.CreatedDate ?? DateTimeOffset.UtcNow,
+                confirmed?.RawPayload ?? request.Payload,
+                metadata);
+        }
+
+        private async Task<CieloLinkOrder?> ConfirmLinkOrderAsync(
+            CieloLinkNotification notification,
+            CieloLinkCredentials? credentials,
+            CancellationToken cancellationToken)
+        {
+            if (credentials is null || string.IsNullOrWhiteSpace(notification.CheckoutCieloOrderNumber))
+                return null;
+
+            var response = await _cieloLinkProvider.GetOrderAsync(
+                notification.CheckoutCieloOrderNumber,
+                credentials,
+                cancellationToken);
+
+            return response.Success ? response.Data : null;
+        }
+
+        private CieloLinkRequest BuildLink(PaymentProviderRequest request, CieloIntegrationConfig config)
+        {
+            var recurrence = request.Recurrence;
+            var type = recurrence is not null
+                ? CieloLinkProductTypes.Recurrent
+                : Read(request.Metadata, CieloMetadataKeys.LinkProductType)
+                    ?? config.LinkProductType
+                    ?? _options.LinkProductType;
+
+            return new CieloLinkRequest
+            {
+                OrderNumber = BuildLinkOrderNumber(request),
+                Type = type,
+                Name = BuildLinkName(request),
+                Description = Read(request.Metadata, CieloMetadataKeys.LinkDescription),
+                Price = ToCents(request.Amount),
+                ExpirationDate = FormatLinkExpiration(request, config),
+                SoftDescriptor = ResolveSoftDescriptor(request.Metadata, config),
+                MaxNumberOfInstallments = recurrence is null ? ResolveLinkInstallments(request, config) : null,
+                Quantity = 1,
+                Sku = Read(request.Metadata, CieloMetadataKeys.LinkSku),
+                Shipping = new CieloLinkShipping
+                {
+                    Type = Read(request.Metadata, CieloMetadataKeys.LinkShippingType)
+                        ?? config.LinkShippingType
+                        ?? _options.LinkShippingType
+                },
+                Recurrent = recurrence is null
+                    ? null
+                    : new CieloLinkRecurrent
+                    {
+                        Interval = ResolveInterval(recurrence.Interval, config).ToString(),
+                        EndDate = FormatDate(recurrence.EndDate)
+                    },
+                CustomLinkConfiguration = BuildLinkConfiguration(request, config)
+            };
+        }
+
+        private CieloLinkCustomConfiguration? BuildLinkConfiguration(
+            PaymentProviderRequest request,
+            CieloIntegrationConfig config)
+        {
+            var configured = Read(request.Metadata, CieloMetadataKeys.LinkPaymentTypes) ?? config.LinkPaymentTypes;
+            var paymentTypes = configured is null
+                ? [.. _options.LinkPaymentTypes]
+                : configured
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+
+            return paymentTypes.Count == 0
+                ? null
+                : new CieloLinkCustomConfiguration { PaymentTypes = paymentTypes };
+        }
+
+        private int? ResolveLinkInstallments(PaymentProviderRequest request, CieloIntegrationConfig config)
+        {
+            var installments = request.InstallmentCount > 1
+                ? request.InstallmentCount
+                : int.TryParse(Read(request.Metadata, CieloMetadataKeys.LinkMaxInstallments), out var configured)
+                    ? configured
+                    : config.LinkMaxInstallments ?? _options.LinkMaxInstallments;
+
+            if (installments is null or <= 1)
+                return null;
+
+            return installments > LinkMaxInstallments ? LinkMaxInstallments : installments;
+        }
+
+        private string? FormatLinkExpiration(PaymentProviderRequest request, CieloIntegrationConfig config)
+        {
+            if (request.ExpiresAt.HasValue)
+                return request.ExpiresAt.Value.ToString(DateFormat, CultureInfo.InvariantCulture);
+
+            var days = config.LinkExpirationDays ?? _options.LinkExpirationDays;
+
+            return days is null or <= 0
+                ? null
+                : DateTimeOffset.UtcNow.AddDays(days.Value).ToString(DateFormat, CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildLinkName(PaymentProviderRequest request)
+        {
+            var name = Read(request.Metadata, CieloMetadataKeys.LinkName)
+                ?? (string.IsNullOrWhiteSpace(request.Reference) ? "Cobranca" : $"Pedido {request.Reference.Trim()}");
+
+            return name.Length > LinkNameMaxLength ? name[..LinkNameMaxLength] : name;
+        }
+
+        private static string BuildLinkOrderNumber(PaymentProviderRequest request)
+        {
+            var reference = Sanitize(request.Reference);
+            if (reference.Length == 0)
+                reference = Sanitize(request.IdempotencyKey);
+
+            return reference.Length > LinkOrderNumberMaxLength
+                ? reference[..LinkOrderNumberMaxLength]
+                : reference;
+        }
+
+        /// <summary>
+        /// Um link aceita mais de um pedido. Um pagamento concluido vale mais que uma
+        /// tentativa recusada, e entre iguais vale o mais recente.
+        /// </summary>
+        private static CieloLinkOrder? SelectRelevantOrder(CieloLinkOrderList orders) =>
+            orders.Orders
+                .OrderByDescending(x => RankLinkStatus(x.Payment?.Status))
+                .ThenByDescending(x => x.CreatedDate, StringComparer.Ordinal)
+                .FirstOrDefault();
+
+        private static int RankLinkStatus(CieloLinkStatusEnum? status) =>
+            status switch
+            {
+                CieloLinkStatusEnum.Paid => 5,
+                CieloLinkStatusEnum.Authorized => 4,
+                CieloLinkStatusEnum.AuthorizedIdPayPending => 3,
+                CieloLinkStatusEnum.Pending => 2,
+                null => 0,
+                _ => 1
+            };
+
+        // A listagem por link e a consulta por pedido nomeiam o identificador do Checkout
+        // Cielo de formas diferentes, entao as duas leituras caem aqui.
+        private static string? ResolveCheckoutOrderNumber(CieloLinkOrder? order) =>
+            string.IsNullOrWhiteSpace(order?.CheckoutCieloOrderNumber)
+                ? (string.IsNullOrWhiteSpace(order?.OrderNumber) ? null : order.OrderNumber.Trim())
+                : order.CheckoutCieloOrderNumber.Trim();
+
+        private static PaymentProviderResult MapCreatedLink(CieloLinkResponse link)
+        {
+            var metadata = new Dictionary<string, string>();
+            AddWhenFilled(metadata, CieloLinkMetadata.LinkId, link.Id);
+            AddWhenFilled(metadata, CieloLinkMetadata.ShortUrl, link.ShortUrl);
+            AddWhenFilled(metadata, "link_type", link.Type);
+
+            return new PaymentProviderResult(
+                IsSuccess: true,
+                Status: PaymentProviderStatusEnum.Pending,
+                TransactionId: link.Id,
+                Reference: link.OrderNumber,
+                PaymentUrl: BuildUri(link.ShortUrl),
+                Amount: link.Price.HasValue ? FromCents(link.Price.Value) : null,
+                ExpiresAt: ParseLinkDate(link.ExpirationDate),
+                Message: "Link de pagamento gerado. Envie a URL para o cliente concluir o pagamento.",
+                RawPayload: link.RawPayload,
+                Metadata: metadata);
+        }
+
+        private static PaymentProviderResult MapLinkOrder(
+            string linkId,
+            CieloLinkOrder order,
+            string? rawPayload,
+            bool isSuccess)
+        {
+            var payment = order.Payment;
+            var metadata = new Dictionary<string, string>();
+            AddWhenFilled(metadata, CieloLinkMetadata.LinkId, linkId);
+            AddWhenFilled(metadata, CieloLinkMetadata.CheckoutOrderNumber, ResolveCheckoutOrderNumber(order));
+            AddWhenFilled(metadata, "payment_method_type", payment?.PaymentMethodType);
+            AddWhenFilled(metadata, "tid", payment?.Tid);
+            AddWhenFilled(metadata, "authorization_code", payment?.AuthorizationCode);
+            AddWhenFilled(metadata, "boleto_number", payment?.BoletoNumber);
+
+            return new PaymentProviderResult(
+                IsSuccess: isSuccess,
+                Status: MapLinkStatus(payment?.Status),
+                TransactionId: linkId,
+                Reference: ResolveCheckoutOrderNumber(order),
+                QrCode: payment?.QrCodeUrl,
+                Barcode: payment?.BoletoNumber,
+                Amount: payment?.Price.HasValue == true ? FromCents(payment.Price!.Value) : null,
+                RawPayload: rawPayload,
+                Metadata: metadata);
+        }
+
+        private static Dictionary<string, string> BuildLinkMetadata(
+            CieloLinkNotification notification,
+            CieloLinkOrder? confirmed)
+        {
+            var metadata = new Dictionary<string, string>();
+            AddWhenFilled(metadata, CieloLinkMetadata.CheckoutOrderNumber, notification.CheckoutCieloOrderNumber);
+            AddWhenFilled(metadata, CieloLinkMetadata.LinkId, notification.ProductId);
+            AddWhenFilled(metadata, "order_number", notification.OrderNumber);
+            AddWhenFilled(metadata, "payment_method_type", notification.PaymentMethodType);
+            AddWhenFilled(metadata, "tid", notification.Tid ?? confirmed?.Payment?.Tid);
+            AddWhenFilled(metadata, "boleto_number", notification.BoletoNumber);
+            AddWhenFilled(metadata, "end_to_end_id", notification.EndToEndId);
+            AddWhenFilled(metadata, "recurrent_payment_id", notification.RecurrentPaymentId);
+            AddWhenFilled(metadata, "confirmed_by_query", confirmed is null ? "false" : "true");
+
+            if (notification.IsTest)
+                metadata["test_transaction"] = "true";
+
+            return metadata;
+        }
+
+        private static PaymentProviderStatusEnum MapLinkStatus(CieloLinkStatusEnum? status) =>
+            status switch
+            {
+                CieloLinkStatusEnum.Paid => PaymentProviderStatusEnum.Paid,
+                CieloLinkStatusEnum.Authorized => PaymentProviderStatusEnum.Authorized,
+                CieloLinkStatusEnum.Denied => PaymentProviderStatusEnum.Failed,
+                CieloLinkStatusEnum.NotFinalized => PaymentProviderStatusEnum.Failed,
+                CieloLinkStatusEnum.Expired => PaymentProviderStatusEnum.Expired,
+                CieloLinkStatusEnum.Voided => PaymentProviderStatusEnum.Cancelled,
+                _ => PaymentProviderStatusEnum.Pending
+            };
+
+        private static bool IsPaymentLink(string? methodCode) =>
+            CieloMethodCodes.TryResolve(methodCode, out var method) &&
+            method == CieloPaymentMethodEnum.PaymentLink;
+
+        /// <summary>
+        /// Credenciais da API Link de Pagamento: o que a integracao do tenant informa tem
+        /// prioridade e o que faltar vem da configuracao padrao da aplicacao.
+        /// </summary>
+        private CieloLinkCredentials? ResolveLinkCredentials(
+            PaymentProviderContext? context,
+            CieloIntegrationConfig config)
+        {
+            var secrets = context?.Secrets;
+            var fallback = _options.DefaultLinkCredentials;
+
+            var clientId = FirstFilled(
+                Read(secrets, CieloSecretKeys.LinkClientId),
+                config.LinkClientId,
+                fallback?.ClientId);
+            var clientSecret = FirstFilled(
+                Read(secrets, CieloSecretKeys.LinkClientSecret),
+                fallback?.ClientSecret);
+
+            if (clientId is null || clientSecret is null)
+                return null;
+
+            return new CieloLinkCredentials { ClientId = clientId, ClientSecret = clientSecret };
         }
 
         private CieloSaleRequest BuildSale(
@@ -500,7 +944,8 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
                 ExpiresAt: ParseDate(payment.ExpirationDate),
                 Message: payment.ReturnMessage ?? payment.ReasonMessage,
                 RawPayload: sale.RawPayload,
-                Metadata: BuildResultMetadata(payment));
+                Metadata: BuildResultMetadata(payment),
+                QrCodeImage: payment.QrCodeBase64Image);
         }
 
         private static PaymentProviderResult MapOperation(
@@ -652,5 +1097,32 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
         private const string MissingCredentialsMessage =
             "Credenciais da Cielo nao foram configuradas para a integracao.";
+
+        private const string MissingLinkCredentialsMessage =
+            "Credenciais da API Link de Pagamento nao foram configuradas para a integracao.";
+
+        private static DateTimeOffset? ParseLinkDate(string? value)
+        {
+            var formats = new[] { DateFormat, ReceivedDateFormat, $"{DateFormat}'T'HH:mm:ss" };
+
+            return DateTime.TryParseExact(
+                value,
+                formats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var date)
+                ? new DateTimeOffset(date, TimeSpan.Zero)
+                : null;
+        }
+    }
+
+    /// <summary>
+    /// Chaves publicadas no <c>Metadata</c> das cobrancas criadas pelo Link de Pagamento.
+    /// </summary>
+    internal static class CieloLinkMetadata
+    {
+        internal const string LinkId = "link_id";
+        internal const string ShortUrl = "link_short_url";
+        internal const string CheckoutOrderNumber = "checkout_cielo_order_number";
     }
 }
