@@ -4,6 +4,7 @@ using JotaSystem.Sdk.Providers.Payments.Cielo.Link;
 using JotaSystem.Sdk.Providers.Payments.Cielo.Link.Models;
 using JotaSystem.Sdk.Providers.Payments.Cielo.Models;
 using System.Globalization;
+using System.Text;
 
 namespace JotaSystem.Sdk.Providers.Payments.Cielo
 {
@@ -838,13 +839,18 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             };
         }
 
+        /// <summary>
+        /// O texto da fatura e alfanumerico: espaco, acento e simbolo fazem a Cielo recusar a
+        /// cobranca inteira, entao o que o operador digitou e reduzido em vez de barrado.
+        /// </summary>
         private string? ResolveSoftDescriptor(IReadOnlyDictionary<string, string>? metadata, CieloIntegrationConfig config)
         {
-            var descriptor = Read(metadata, CieloMetadataKeys.SoftDescriptor)
+            var descriptor = Sanitize(
+                Read(metadata, CieloMetadataKeys.SoftDescriptor)
                 ?? config.SoftDescriptor
-                ?? _options.SoftDescriptor;
+                ?? _options.SoftDescriptor);
 
-            if (string.IsNullOrWhiteSpace(descriptor))
+            if (descriptor.Length == 0)
                 return null;
 
             return descriptor.Length > SoftDescriptorMaxLength
@@ -1093,10 +1099,27 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             return digits.Length == 0 ? null : digits;
         }
 
-        private static string Sanitize(string? value) =>
-            string.IsNullOrWhiteSpace(value)
-                ? string.Empty
-                : new string(value.Where(char.IsLetterOrDigit).ToArray());
+        // Nestes campos a Cielo so aceita letras e digitos ASCII: o acento vira a letra base
+        // e o resto e descartado, para nao levar a cobranca inteira a ser recusada.
+        private static string Sanitize(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var normalized = value.Normalize(NormalizationForm.FormD);
+            var sanitized = new StringBuilder(normalized.Length);
+
+            foreach (var character in normalized)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
+                    continue;
+
+                if (char.IsAsciiLetterOrDigit(character))
+                    sanitized.Append(character);
+            }
+
+            return sanitized.ToString();
+        }
 
         private const string MissingCredentialsMessage =
             "Credenciais da Cielo nao foram configuradas para a integracao.";

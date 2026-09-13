@@ -152,6 +152,22 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task CreateAsync_Should_Reduce_The_Soft_Descriptor_To_What_Cielo_Accepts()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateTokenResponse(),
+                CreateResponse($$"""{"id":"{{LinkId}}","shortUrl":"https://cielolink.com.br/abc123"}""",
+                    HttpStatusCode.Created));
+            var provider = CreateGateway(handler, options => options.SoftDescriptor = "Laser Liné Estética");
+
+            await provider.CreateAsync(
+                CreateRequest(CieloMethodCodes.PaymentLink),
+                TestContext.Current.CancellationToken);
+
+            Assert.Contains("\"softDescriptor\":\"LaserLineEste\"", handler.Requests[1].Content);
+        }
+
+        [Fact]
         public async Task CreateAsync_Should_Fail_Without_The_Payment_Link_Credentials()
         {
             var handler = new RecordingHttpMessageHandler();
