@@ -115,10 +115,10 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
             if (!response.IsSuccess)
                 return ApiResponse<CieloLinkOrderList>.CreateFail(response.ErrorMessage!);
 
-            var data = Deserialize<CieloLinkOrderList>(response.Content);
+            var data = TryDeserialize<CieloLinkOrderList>(response.Content, out var error);
             if (data is null)
                 return ApiResponse<CieloLinkOrderList>.CreateFail(
-                    DescribeInvalidResponse("listar os pedidos do link", response.Content));
+                    DescribeInvalidResponse("listar os pedidos do link", response.Content, error));
 
             data.RawPayload = response.Content;
             return ApiResponse<CieloLinkOrderList>.CreateSuccess(data);
@@ -146,10 +146,10 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
             if (!response.IsSuccess)
                 return ApiResponse<CieloLinkOrder>.CreateFail(response.ErrorMessage!);
 
-            var data = Deserialize<CieloLinkOrder>(response.Content);
+            var data = TryDeserialize<CieloLinkOrder>(response.Content, out var error);
             if (data is null)
                 return ApiResponse<CieloLinkOrder>.CreateFail(
-                    DescribeInvalidResponse("consultar o pedido do Checkout Cielo", response.Content));
+                    DescribeInvalidResponse("consultar o pedido do Checkout Cielo", response.Content, error));
 
             data.RawPayload = response.Content;
             return ApiResponse<CieloLinkOrder>.CreateSuccess(data);
@@ -222,10 +222,12 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
                     return ApiResponse<string>.CreateFail(
                         $"Erro ao autenticar no Link de Pagamento: {DescribeError(response.StatusCode, content)}");
 
-                var token = Deserialize<CieloAuthToken>(content);
+                var token = TryDeserialize<CieloAuthToken>(content, out var error);
                 if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
-                    return ApiResponse<string>.CreateFail(
-                        DescribeInvalidResponse("autenticar no Link de Pagamento", content));
+                    return ApiResponse<string>.CreateFail(DescribeInvalidResponse(
+                        "autenticar no Link de Pagamento",
+                        content,
+                        error ?? "o corpo nao trouxe o access_token"));
 
                 _authTokenCache.Set(cacheKey, token.AccessToken, DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn));
                 return ApiResponse<string>.CreateSuccess(token.AccessToken);
@@ -285,10 +287,12 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
             if (!response.IsSuccess)
                 return ApiResponse<CieloLinkResponse>.CreateFail(response.ErrorMessage!);
 
-            var data = Deserialize<CieloLinkResponse>(response.Content);
+            var data = TryDeserialize<CieloLinkResponse>(response.Content, out var error);
             if (data is null || string.IsNullOrWhiteSpace(data.Id))
-                return ApiResponse<CieloLinkResponse>.CreateFail(
-                    DescribeInvalidResponse("ler o link de pagamento", response.Content));
+                return ApiResponse<CieloLinkResponse>.CreateFail(DescribeInvalidResponse(
+                    "ler o link de pagamento",
+                    response.Content,
+                    error ?? "o corpo nao trouxe o identificador do link"));
 
             data.RawPayload = response.Content;
             return ApiResponse<CieloLinkResponse>.CreateSuccess(data);
@@ -348,20 +352,41 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
 
         private static string Escape(string value) => Uri.EscapeDataString(value.Trim());
 
-        private static T? Deserialize<T>(string content) where T : class
+        private static T? Deserialize<T>(string content) where T : class =>
+            TryDeserialize<T>(content, out var error) is { } value && error is null ? value : null;
+
+        /// <summary>
+        /// Lê o corpo devolvendo também o motivo da falha. Sem o motivo, uma resposta que
+        /// não abre vira só "resposta invalida" e não dá para saber o que a Cielo mandou.
+        /// </summary>
+        private static T? TryDeserialize<T>(string content, out string? error) where T : class
         {
+            error = null;
+
             if (string.IsNullOrWhiteSpace(content))
+            {
+                error = "corpo vazio";
                 return null;
+            }
 
             try
             {
-                return CieloLinkJson.Deserialize<T>(content);
+                var value = CieloLinkJson.Deserialize<T>(Clean(content));
+                if (value is null)
+                    error = "o corpo nao representa um objeto";
+
+                return value;
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+                error = ex.Message;
                 return null;
             }
         }
+
+        // A Cielo ja devolveu o JSON com BOM: ele nao e espaco em branco e derruba o parser
+        // com um erro de "caractere invalido" que nem aparece na tela.
+        private static string Clean(string content) => content.Trim().TrimStart('﻿', '​');
 
         private static string DescribeError(HttpStatusCode statusCode, string content)
         {
@@ -426,17 +451,21 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
         /// Uma resposta que nao da para ler so vira diagnostico com o conteudo junto: sem ele
         /// nao da para saber se a Cielo devolveu erro, HTML de login ou corpo vazio.
         /// </summary>
-        private static string DescribeInvalidResponse(string step, string content) =>
+        private static string DescribeInvalidResponse(string step, string content, string? error) =>
             string.IsNullOrWhiteSpace(content)
                 ? $"A Cielo respondeu com o corpo vazio ao {step}."
-                : $"Resposta invalida retornada pela Cielo ao {step}: {Summarize(content)}";
+                : $"Resposta invalida retornada pela Cielo ao {step} ({error}). Corpo: {Summarize(content)}";
 
+        // Um corpo com token JWT estoura o limite so no cabecalho, e o campo problematico
+        // costuma estar no fim, entao o resumo mostra as duas pontas.
         private static string Summarize(string content)
         {
-            var trimmed = content.Trim();
-            return trimmed.Length > ContentSummaryMaxLength
-                ? $"{trimmed[..ContentSummaryMaxLength]}..."
-                : trimmed;
+            var trimmed = Clean(content);
+            if (trimmed.Length <= ContentSummaryMaxLength)
+                return trimmed;
+
+            var edge = ContentSummaryMaxLength / 2;
+            return $"{trimmed[..edge]} [...] {trimmed[^edge..]}";
         }
 
         private const int ContentSummaryMaxLength = 400;

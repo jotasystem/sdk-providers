@@ -117,6 +117,26 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task CreateAsync_Should_Accept_The_Token_Serialized_By_Newtonsoft()
+        {
+            // O Checkout Cielo devolve "$id" e ja mandou numero como texto neste corpo.
+            var handler = new RecordingHttpMessageHandler(
+                CreateResponse("""
+                {"$id":"1","access_token":"link-access-token","token_type":"bearer","expires_in":"1199"}
+                """),
+                CreateResponse($$"""{"id":"{{LinkId}}","shortUrl":"https://cielolink.com.br/abc123"}""",
+                    HttpStatusCode.Created));
+            var provider = CreateGateway(handler);
+
+            var result = await provider.CreateAsync(
+                CreateRequest(CieloMethodCodes.PaymentLink),
+                TestContext.Current.CancellationToken);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(LinkId, result.TransactionId);
+        }
+
+        [Fact]
         public async Task CreateAsync_Should_Report_An_Empty_Body_From_The_Token_Endpoint()
         {
             var handler = new RecordingHttpMessageHandler(CreateResponse(string.Empty));
