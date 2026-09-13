@@ -117,7 +117,8 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
 
             var data = Deserialize<CieloLinkOrderList>(response.Content);
             if (data is null)
-                return ApiResponse<CieloLinkOrderList>.CreateFail(InvalidResponseMessage);
+                return ApiResponse<CieloLinkOrderList>.CreateFail(
+                    DescribeInvalidResponse("listar os pedidos do link", response.Content));
 
             data.RawPayload = response.Content;
             return ApiResponse<CieloLinkOrderList>.CreateSuccess(data);
@@ -147,7 +148,8 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
 
             var data = Deserialize<CieloLinkOrder>(response.Content);
             if (data is null)
-                return ApiResponse<CieloLinkOrder>.CreateFail(InvalidResponseMessage);
+                return ApiResponse<CieloLinkOrder>.CreateFail(
+                    DescribeInvalidResponse("consultar o pedido do Checkout Cielo", response.Content));
 
             data.RawPayload = response.Content;
             return ApiResponse<CieloLinkOrder>.CreateSuccess(data);
@@ -222,7 +224,8 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
 
                 var token = Deserialize<CieloAuthToken>(content);
                 if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
-                    return ApiResponse<string>.CreateFail(InvalidResponseMessage);
+                    return ApiResponse<string>.CreateFail(
+                        DescribeInvalidResponse("autenticar no Link de Pagamento", content));
 
                 _authTokenCache.Set(cacheKey, token.AccessToken, DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn));
                 return ApiResponse<string>.CreateSuccess(token.AccessToken);
@@ -284,7 +287,8 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
 
             var data = Deserialize<CieloLinkResponse>(response.Content);
             if (data is null || string.IsNullOrWhiteSpace(data.Id))
-                return ApiResponse<CieloLinkResponse>.CreateFail(InvalidResponseMessage);
+                return ApiResponse<CieloLinkResponse>.CreateFail(
+                    DescribeInvalidResponse("ler o link de pagamento", response.Content));
 
             data.RawPayload = response.Content;
             return ApiResponse<CieloLinkResponse>.CreateSuccess(data);
@@ -418,11 +422,29 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link
             }
         }
 
+        /// <summary>
+        /// Uma resposta que nao da para ler so vira diagnostico com o conteudo junto: sem ele
+        /// nao da para saber se a Cielo devolveu erro, HTML de login ou corpo vazio.
+        /// </summary>
+        private static string DescribeInvalidResponse(string step, string content) =>
+            string.IsNullOrWhiteSpace(content)
+                ? $"A Cielo respondeu com o corpo vazio ao {step}."
+                : $"Resposta invalida retornada pela Cielo ao {step}: {Summarize(content)}";
+
+        private static string Summarize(string content)
+        {
+            var trimmed = content.Trim();
+            return trimmed.Length > ContentSummaryMaxLength
+                ? $"{trimmed[..ContentSummaryMaxLength]}..."
+                : trimmed;
+        }
+
+        private const int ContentSummaryMaxLength = 400;
+
         private const string MissingCredentialsMessage =
             "Credenciais da API Link de Pagamento nao foram configuradas para a integracao.";
         private const string MissingLinkMessage = "Informe o identificador do link de pagamento.";
         private const string MissingOrderMessage = "Informe o numero do pedido gerado pelo Checkout Cielo.";
-        private const string InvalidResponseMessage = "Resposta invalida retornada pela Cielo.";
         private const string TimeoutMessage = "Tempo limite excedido na comunicacao com a Cielo.";
 
         private sealed record CieloLinkHttpResponse(bool IsSuccess, string Content, string? ErrorMessage);

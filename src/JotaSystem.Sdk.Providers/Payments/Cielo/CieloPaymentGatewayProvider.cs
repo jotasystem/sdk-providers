@@ -456,7 +456,10 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
             return paymentTypes.Count == 0
                 ? null
-                : new CieloLinkCustomConfiguration { PaymentTypes = paymentTypes };
+                : new CieloLinkCustomConfiguration
+                {
+                    PaymentTypes = [.. paymentTypes.Select(x => new CieloLinkOption(x))]
+                };
         }
 
         private int? ResolveLinkInstallments(PaymentProviderRequest request, CieloIntegrationConfig config)

@@ -78,6 +78,60 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task CreateAsync_Should_Send_The_Payment_Types_As_Objects()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateTokenResponse(),
+                CreateResponse($$"""{"id":"{{LinkId}}","shortUrl":"https://cielolink.com.br/abc123"}""",
+                    HttpStatusCode.Created));
+            var provider = CreateGateway(handler, options =>
+            {
+                options.LinkPaymentTypes.Add(CieloLinkPaymentTypes.CreditCard);
+                options.LinkPaymentTypes.Add(CieloLinkPaymentTypes.Pix);
+            });
+
+            await provider.CreateAsync(
+                CreateRequest(CieloMethodCodes.PaymentLink),
+                TestContext.Current.CancellationToken);
+
+            var creation = handler.Requests[1].Content;
+            Assert.Contains("""
+                "paymentTypes":[{"type":"CreditCard"},{"type":"Pix"}]
+                """.Trim(), creation);
+        }
+
+        [Fact]
+        public async Task CreateAsync_Should_Report_What_Cielo_Answered_When_The_Response_Cannot_Be_Read()
+        {
+            var handler = new RecordingHttpMessageHandler(
+                CreateTokenResponse(),
+                CreateResponse("<html><body>Sessao expirada</body></html>", HttpStatusCode.OK));
+            var provider = CreateGateway(handler);
+
+            var result = await provider.CreateAsync(
+                CreateRequest(CieloMethodCodes.PaymentLink),
+                TestContext.Current.CancellationToken);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("Sessao expirada", result.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_Should_Report_An_Empty_Body_From_The_Token_Endpoint()
+        {
+            var handler = new RecordingHttpMessageHandler(CreateResponse(string.Empty));
+            var provider = CreateGateway(handler);
+
+            var result = await provider.CreateAsync(
+                CreateRequest(CieloMethodCodes.PaymentLink),
+                TestContext.Current.CancellationToken);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("corpo vazio", result.Message);
+            Assert.Contains("autenticar", result.Message);
+        }
+
+        [Fact]
         public async Task CreateAsync_Should_Fail_Without_The_Payment_Link_Credentials()
         {
             var handler = new RecordingHttpMessageHandler();

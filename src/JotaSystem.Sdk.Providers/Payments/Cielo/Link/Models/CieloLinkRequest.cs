@@ -71,9 +71,22 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Link.Models
     public class CieloLinkCustomConfiguration
     {
         /// <summary>Ver <see cref="CieloLinkPaymentTypes"/>. Vazio mantem a configuracao da loja.</summary>
-        public List<string> PaymentTypes { get; set; } = [];
+        public List<CieloLinkOption> PaymentTypes { get; set; } = [];
 
         /// <summary><c>GooglePay</c>, <c>ApplePay</c> ou <c>ClickToPay</c>.</summary>
-        public List<string> Wallets { get; set; } = [];
+        public List<CieloLinkOption> Wallets { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Item das listas de meios de pagamento e carteiras. O contrato do Checkout Cielo
+    /// espera objetos (<c>{"type":"CreditCard"}</c>), nao uma lista de textos.
+    /// </summary>
+    public class CieloLinkOption
+    {
+        public CieloLinkOption() { }
+
+        public CieloLinkOption(string type) => Type = type;
+
+        public string Type { get; set; } = string.Empty;
     }
 }
