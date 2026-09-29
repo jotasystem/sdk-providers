@@ -2,6 +2,7 @@ using JotaSystem.Sdk.Providers.Communication.Email.Brevo;
 using JotaSystem.Sdk.Providers.Communication.Email.SendGrid;
 using JotaSystem.Sdk.Providers.Communication.Email.SendPulse;
 using JotaSystem.Sdk.Providers.Communication.Email.Smtp;
+using JotaSystem.Sdk.Providers.Communication.Sms.Brevo;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JotaSystem.Sdk.Providers.Communication
@@ -14,6 +15,15 @@ namespace JotaSystem.Sdk.Providers.Communication
             configure(options);
 
             builder.Services.AddSingleton<IBrevoProvider>(new BrevoProvider(options));
+            return builder;
+        }
+
+        public static JotaSystemSdkBuilder AddBrevoSms(this JotaSystemSdkBuilder builder, Action<BrevoSmsOptions> configure)
+        {
+            var options = new BrevoSmsOptions();
+            configure(options);
+
+            builder.Services.AddSingleton<IBrevoSmsProvider>(new BrevoSmsProvider(options));
             return builder;
         }
 
