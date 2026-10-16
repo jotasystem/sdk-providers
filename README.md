@@ -11,7 +11,7 @@ Hoje o pacote contém:
 - `Abstractions` com `ApiResponse` e `ProviderBase` para padronizar chamadas HTTP e respostas.
 - `Logistics` centraliza consulta de endereços e fretes via `ViaCep`, `OpenCep`, `BrasilApi` e `Correios`.
 - `Ai` com integração de chat via `OpenAI`.
-- `Communication` centraliza os canais `Email`, `Sms` e `PushNotification`, com implementações de e-mail para `SMTP`, `Brevo`, `SendGrid` e `SendPulse`.
+- `Communication` centraliza os canais `Email`, `Sms`, `WhatsApp` e `PushNotification`, com implementações de e-mail para `SMTP`, `Brevo`, `SendGrid` e `SendPulse` e de WhatsApp para a `Evolution API`.
 - `Storage` com implementação para `Azure Blob Storage`.
 - `Payments` com o contrato de gateway de pagamento e a integração completa com a `Cielo` (API E-commerce 3.0).
 - `DependencyInjection` com `AddJotaSystemProviders()` e extensões modulares por área.
@@ -89,11 +89,39 @@ Os metadados da cobrança ficam reservados aos ajustes específicos da Cielo, co
 
 As credenciais são resolvidas nesta ordem: credenciais nomeadas em `NamedCredentials` pela `SecretReference` da integração; `merchantId` do `PublicConfigJson` combinado com a `SecretReference` como `MerchantKey`; e, por último, `DefaultCredentials`. O ambiente (`sandbox` ou `production`) vem da própria integração.
 
+## WhatsApp (Evolution API)
+
+`AddEvolutionApi()` registra o `IEvolutionApiProvider`, que fala com um servidor da [Evolution API](https://doc.evolution-api.com) v2. Cada número de WhatsApp é uma **instância** do servidor; todas as chamadas recebem o nome da instância e são autenticadas pelo header `apikey`.
+
+```csharp
+services.AddJotaSystemProviders()
+    .AddEvolutionApi(options =>
+    {
+        // Opcional: sem servidor padrão, cada chamada informa as próprias EvolutionApiCredentials.
+        options.DefaultCredentials = new EvolutionApiCredentials
+        {
+            BaseUrl = "https://evolution.minhaempresa.com.br",
+            ApiKey = "AUTHENTICATION_API_KEY do servidor"
+        };
+    });
+```
+
+Fluxo para conectar um número:
+
+1. `CreateInstanceAsync` cria a instância (com as `EvolutionInstanceSettings` e o webhook) e já devolve o primeiro QR Code e o token da instância.
+2. `ConnectInstanceAsync` renova o QR Code (ele expira em cerca de 40 segundos). Informando o número, devolve também o código de pareamento de 8 caracteres.
+3. `GetConnectionStateAsync` ou o evento `CONNECTION_UPDATE` do webhook indicam quando a sessão abre (`Open`). `FetchInstancesAsync` devolve o número e o nome do perfil conectados.
+4. `LogoutInstanceAsync` desconecta o aparelho; `DeleteInstanceAsync` remove a instância.
+
+Mensagens: `SendTextAsync`, `SendMediaAsync` (URL ou base64) e `CheckWhatsAppNumbersAsync`. Números nacionais com 10 ou 11 dígitos recebem o DDI de `EvolutionApiOptions.DefaultCountryCode` (padrão `55`) — ver `EvolutionPhoneNumber`.
+
+Webhook: `EvolutionWebhookParser.Parse` (ou `IEvolutionApiProvider.ParseWebhook`) lê a notificação e normaliza o evento para as constantes de `EvolutionWebhookEvents`, preenchendo o estado da conexão, o QR Code ou a mensagem conforme o evento.
+
 ## Providers disponíveis
 
 - Logística: `IViaCepProvider`, `IOpenCepProvider`, `IBrasilApiProvider`, `ICorreiosProvider`, `IMelhorEnvioProvider`
 - IA: `IOpenAiProvider`
-- Comunicação: `ISmtpProvider`, `IBrevoProvider`, `ISendGridProvider`, `ISendPulseProvider`
+- Comunicação: `ISmtpProvider`, `IBrevoProvider`, `IBrevoSmsProvider`, `ISendGridProvider`, `ISendPulseProvider`, `IEvolutionApiProvider` (WhatsApp)
 - Storage: `IAzureBlobProvider`
 - Pagamentos: `IPaymentGatewayProviderResolver`, `IPaymentGatewayProvider` (chave `cielo`), `ICieloProvider`
 
