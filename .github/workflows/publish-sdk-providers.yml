@@ -4,6 +4,11 @@ on:
   push:
     branches: [ "main" ]
 
+# Publicação Confiável do NuGet: o job troca o token OIDC do GitHub por uma chave temporária.
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -73,12 +78,19 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: dotnet pack ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} -o ${{ env.ARTIFACTS_PATH }}
 
+      - name: 🔐 Login no NuGet (Publicação Confiável)
+        if: steps.check.outputs.exists == 'false'
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: 9️⃣ Publicar no NuGet (somente se versão não existe)
         if: steps.check.outputs.exists == 'false'
         run: |
           if compgen -G "${{ env.ARTIFACTS_PATH }}/*.nupkg" > /dev/null; then
             echo "Publicando pacotes NuGet..."
-            dotnet nuget push "${{ env.ARTIFACTS_PATH }}/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+            dotnet nuget push "${{ env.ARTIFACTS_PATH }}/*.nupkg" --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
           else
             echo "Nenhum pacote .nupkg encontrado em ${{ env.ARTIFACTS_PATH }}"
             exit 1
