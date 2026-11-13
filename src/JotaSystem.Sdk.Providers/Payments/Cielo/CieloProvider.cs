@@ -272,8 +272,10 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
             if (!response.IsSuccess)
                 return ApiResponse<CieloRecurrentPaymentResponse>.CreateFail(response.ErrorMessage!);
 
-            var data = Deserialize<CieloRecurrentPaymentResponse>(response.Content);
-            if (data is null)
+            // A consulta devolve a recorrencia dentro de "RecurrentPayment", junto do "Customer".
+            var data = Deserialize<CieloRecurrentPaymentQueryResponse>(response.Content)?.RecurrentPayment
+                ?? Deserialize<CieloRecurrentPaymentResponse>(response.Content);
+            if (data is null || string.IsNullOrWhiteSpace(data.RecurrentPaymentId))
                 return ApiResponse<CieloRecurrentPaymentResponse>.CreateFail(InvalidResponseMessage);
 
             data.RawPayload = response.Content;

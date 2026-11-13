@@ -34,7 +34,9 @@ namespace JotaSystem.Sdk.Providers.Payments
 
             builder.Services.AddScoped<ICieloProvider, CieloProvider>();
             builder.Services.AddScoped<ICieloLinkProvider, CieloLinkProvider>();
-            builder.Services.AddScoped<IPaymentGatewayProvider, CieloPaymentGatewayProvider>();
+            builder.Services.AddScoped<CieloPaymentGatewayProvider>();
+            builder.Services.AddScoped<IPaymentGatewayProvider>(sp => sp.GetRequiredService<CieloPaymentGatewayProvider>());
+            builder.Services.AddScoped<ICieloRecurrenceGateway>(sp => sp.GetRequiredService<CieloPaymentGatewayProvider>());
 
             return builder;
         }

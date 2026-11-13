@@ -113,6 +113,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Models
         public string? EndDate { get; set; }
 
         /// <summary>Periodicidade em meses. Ver <see cref="CieloRecurrenceIntervalEnum"/>.</summary>
+        [JsonConverter(typeof(CieloRecurrenceIntervalJsonConverter))]
         public int? Interval { get; set; }
 
         public int? RecurrencyDay { get; set; }
@@ -120,11 +121,26 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo.Models
         public string? Currency { get; set; }
         public string? Country { get; set; }
         public bool? Successful { get; set; }
+
+        /// <summary>
+        /// Situacao da recorrencia na consulta: 1 ativa, 2 finalizada, 3 desativada pelo lojista,
+        /// 4 desativada por numero de retentativas, 5 desativada por cartao vencido.
+        /// </summary>
+        public int? Status { get; set; }
+
         public List<CieloLink> Links { get; set; } = [];
 
         /// <summary>Corpo original devolvido pela Cielo, preservado para auditoria.</summary>
         [JsonIgnore]
         public string? RawPayload { get; set; }
+    }
+
+    /// <summary>
+    /// Envelope da consulta <c>GET /1/RecurrentPayment/{id}</c>.
+    /// </summary>
+    internal sealed class CieloRecurrentPaymentQueryResponse
+    {
+        public CieloRecurrentPaymentResponse? RecurrentPayment { get; set; }
     }
 
     /// <summary>

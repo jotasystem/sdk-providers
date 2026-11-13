@@ -427,6 +427,37 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
         }
 
         [Fact]
+        public async Task DeactivateRecurrenceAsync_Should_Call_The_Deactivate_Resource()
+        {
+            var handler = new RecordingHttpMessageHandler(CreateResponse(string.Empty));
+            var gateway = (ICieloRecurrenceGateway)CreateGateway(handler);
+
+            var result = await gateway.DeactivateRecurrenceAsync(
+                " ed535ad9-eb4f-4fef-9a77-a2c9620702ce ",
+                context: null,
+                TestContext.Current.CancellationToken);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(PaymentProviderStatusEnum.Cancelled, result.Status);
+            Assert.EndsWith("/1/RecurrentPayment/ed535ad9-eb4f-4fef-9a77-a2c9620702ce/Deactivate", handler.Requests[0].Url);
+        }
+
+        [Fact]
+        public async Task DeactivateRecurrenceAsync_Should_Fail_Without_Credentials()
+        {
+            var handler = new RecordingHttpMessageHandler(CreateResponse(string.Empty));
+            var gateway = (ICieloRecurrenceGateway)new CieloPaymentGatewayProviderFactory(handler).CreateWithoutDefaultCredentials();
+
+            var result = await gateway.DeactivateRecurrenceAsync(
+                "recurrent-id",
+                context: null,
+                TestContext.Current.CancellationToken);
+
+            Assert.False(result.IsSuccess);
+            Assert.Empty(handler.Requests);
+        }
+
+        [Fact]
         public async Task CancelAsync_Should_Void_The_Transaction()
         {
             var handler = new RecordingHttpMessageHandler(

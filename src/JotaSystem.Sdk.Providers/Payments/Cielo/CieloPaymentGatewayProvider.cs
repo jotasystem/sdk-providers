@@ -17,7 +17,7 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
         ICieloProvider cieloProvider,
         ICieloLinkProvider cieloLinkProvider,
         CieloOptions options)
-        : IPaymentGatewayProvider
+        : IPaymentGatewayProvider, ICieloRecurrenceGateway
     {
         private const string DateFormat = "yyyy-MM-dd";
         private const string ReceivedDateFormat = "yyyy-MM-dd HH:mm:ss";
@@ -112,6 +112,29 @@ namespace JotaSystem.Sdk.Providers.Payments.Cielo
 
             return response.Success
                 ? MapQueriedSale(response.Data!)
+                : Failure(response.ErrorMessage!);
+        }
+
+        public async Task<PaymentProviderResult> DeactivateRecurrenceAsync(
+            string recurrentPaymentId,
+            PaymentProviderContext? context,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(recurrentPaymentId))
+                return Failure("Informe o identificador da recorrencia.");
+
+            var config = CieloIntegrationConfig.Parse(context?.PublicConfigJson);
+            var credentials = ResolveCredentials(context, config);
+            if (credentials is null)
+                return Failure(MissingCredentialsMessage);
+
+            var response = await _cieloProvider.DeactivateRecurrentPaymentAsync(
+                recurrentPaymentId.Trim(),
+                credentials,
+                cancellationToken);
+
+            return response.Success
+                ? new PaymentProviderResult(true, PaymentProviderStatusEnum.Cancelled, TransactionId: recurrentPaymentId.Trim())
                 : Failure(response.ErrorMessage!);
         }
 

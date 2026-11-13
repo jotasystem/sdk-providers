@@ -304,6 +304,33 @@ namespace JotaSystem.Sdk.Providers.Tests.Providers
             Assert.Empty(handler.Requests);
         }
 
+        [Theory]
+        [InlineData("\"Monthly\"", 1)]
+        [InlineData("\"SemiAnnual\"", 6)]
+        [InlineData("3", 3)]
+        [InlineData("null", null)]
+        public async Task GetRecurrentPaymentAsync_Should_Read_Interval_As_Name_Or_Number(string interval, int? expected)
+        {
+            var handler = new RecordingHttpMessageHandler(CreateResponse($$"""
+                {
+                    "RecurrentPayment": {
+                        "RecurrentPaymentId": "recurrent-id",
+                        "NextRecurrency": "2026-12-13",
+                        "Interval": {{interval}},
+                        "Status": 1
+                    }
+                }
+                """));
+            var provider = CreateProvider(handler, CreateCredentials());
+
+            var result = await provider.GetRecurrentPaymentAsync(
+                "recurrent-id",
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(expected, result.Data!.Interval);
+        }
+
         [Fact]
         public async Task DeactivateRecurrentPaymentAsync_Should_Call_Deactivate_Resource()
         {
